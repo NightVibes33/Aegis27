@@ -1,0 +1,99 @@
+import Foundation
+
+@MainActor
+final class ResearchViewModel: ObservableObject {
+    @Published private(set) var profile = DeviceProfiler.current()
+    @Published private(set) var gestaltValues: [MobileGestaltValue] = []
+    @Published private(set) var capabilityResults: [CapabilityProbeResult] = []
+    @Published var isWriteTestingArmed = false
+    @Published var selectedCanaryTarget = FileCapabilityProbe.researchTargets[0]
+    @Published private(set) var primitiveSummary = "Not validated"
+
+    let logger = AuditLogger()
+    let canaryTargets = FileCapabilityProbe.researchTargets
+    private let primitive: any PrivilegedAccessPrimitive = UnavailablePrimitive()
+
+    func refreshBaseline() {
+        profile = DeviceProfiler.current()
+        gestaltValues = MobileGestaltReader.readBaseline()
+        capabilityResults = canaryTargets.map(FileCapabilityProbe.inspect(path:))
+
+        logger.record(ResearchEvent(
+            severity: profile.isAuthorizedTarget ? .success : .warning,
+            subsystem: "target",
+            message: profile.isAuthorizedTarget
+                ? "Authorized target profile matched"
+                : "Target profile mismatch; write tests remain blocked",
+            details: [
+                "hardware": profile.hardwareIdentifier,
+                "version": profile.systemVersion,
+                "build": profile.buildVersion
+            ]
+        ))
+
+        for result in capabilityResults {
+            logger.record(ResearchEvent(
+                severity: result.readable ? .success : .info,
+                subsystem: "filesystem-probe",
+                message: result.readable ? "Directory metadata readable" : "Directory access denied",
+                details: [
+                    "path": result.path,
+                    "readable": String(result.readable),
+                    "writable": String(result.writableAccordingToMetadata),
+                    "error": result.errorDescription ?? "none"
+                ]
+            ))
+        }
+
+        Task {
+            let validation = await primitive.validate()
+            primitiveSummary = validation.summary
+            logger.record(ResearchEvent(
+                severity: .info,
+                subsystem: "primitive",
+                message: validation.summary,
+                details: ["availability": validation.availability.rawValue]
+            ))
+        }
+    }
+
+    func runCanaryWrite() {
+        guard profile.isAuthorizedTarget else {
+            logger.record(ResearchEvent(
+                severity: .failure,
+                subsystem: "canary",
+                message: "Blocked canary write because target profile does not match",
+                details: ["target": profile.targetDescription]
+            ))
+            return
+        }
+
+        guard isWriteTestingArmed else {
+            logger.record(ResearchEvent(
+                severity: .warning,
+                subsystem: "canary",
+                message: "Blocked canary write because testing is not armed"
+            ))
+            return
+        }
+
+        let result = FileCapabilityProbe.writeCanary(to: selectedCanaryTarget)
+        logger.record(ResearchEvent(
+            severity: result.created && result.removed ? .success : .failure,
+            subsystem: "canary",
+            message: result.created
+                ? "Canary creation reached target directory"
+                : "Canary creation denied as expected under the stock sandbox",
+            details: [
+                "path": result.targetDirectory,
+                "created": String(result.created),
+                "removed": String(result.removed),
+                "error": result.errorDescription ?? "none"
+            ]
+        ))
+
+        isWriteTestingArmed = false
+        capabilityResults = canaryTargets.map(FileCapabilityProbe.inspect(path:))
+    }
+}
+

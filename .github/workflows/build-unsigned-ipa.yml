@@ -1,0 +1,75 @@
+name: Build unsigned research IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Select newest installed Xcode
+        shell: bash
+        run: |
+          set -euo pipefail
+          XCODE_APP="$(find /Applications -maxdepth 1 -name 'Xcode*.app' -print | sort | tail -1)"
+          test -n "$XCODE_APP"
+          echo "DEVELOPER_DIR=$XCODE_APP/Contents/Developer" >> "$GITHUB_ENV"
+          "$XCODE_APP/Contents/Developer/usr/bin/xcodebuild" -version
+
+      - name: Install XcodeGen
+        shell: bash
+        run: brew install xcodegen
+
+      - name: Validate research guardrails
+        run: ./scripts/validate_repo.sh
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build device application without signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project Aegis27.xcodeproj \
+            -scheme Aegis27 \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            clean build
+
+      - name: Package unsigned IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_PATH="$(find build/DerivedData/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' -print -quit)"
+          test -n "$APP_PATH"
+          mkdir -p build/package/Payload
+          cp -R "$APP_PATH" build/package/Payload/
+          cd build/package
+          /usr/bin/ditto -c -k --sequesterRsrc --keepParent Payload Aegis27-unsigned.ipa
+          /usr/bin/shasum -a 256 Aegis27-unsigned.ipa > Aegis27-unsigned.ipa.sha256
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aegis27-unsigned-${{ github.sha }}
+          path: |
+            build/package/Aegis27-unsigned.ipa
+            build/package/Aegis27-unsigned.ipa.sha256
+          if-no-files-found: error
+          retention-days: 14
