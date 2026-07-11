@@ -29,7 +29,6 @@ jobs:
           set -euo pipefail
           ipsw --no-color download appledb \
             --os iOS \
-            --beta \
             --build 24A5380h \
             --device iPhone17,3 \
             --urls \
