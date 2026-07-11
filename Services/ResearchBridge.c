@@ -3,11 +3,15 @@
 #include <dlfcn.h>
 #include <limits.h>
 #include <mach/mach.h>
-#include <servers/bootstrap.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 typedef int (*sandbox_check_function)(pid_t, const char *, int, ...);
+typedef kern_return_t (*bootstrap_lookup_function)(
+    mach_port_t,
+    const char *,
+    mach_port_t *
+);
 
 enum {
     AEGIS_SANDBOX_FILTER_PATH = 1,
@@ -55,15 +59,30 @@ int32_t aegis_bootstrap_lookup_service(const char *name) {
         return KERN_INVALID_ARGUMENT;
     }
 
-    mach_port_t service_port = MACH_PORT_NULL;
-    kern_return_t result = bootstrap_look_up(
-        bootstrap_port,
-        (char *)name,
-        &service_port
+    bootstrap_lookup_function lookup =
+        (bootstrap_lookup_function)dlsym(RTLD_DEFAULT, "bootstrap_look_up");
+    if (lookup == NULL) {
+        return KERN_NOT_SUPPORTED;
+    }
+
+    // TASK_BOOTSTRAP_PORT is task special port slot 4. Obtaining our own
+    // bootstrap port does not require a private SDK header.
+    mach_port_t bootstrap = MACH_PORT_NULL;
+    kern_return_t result = task_get_special_port(
+        mach_task_self(),
+        4,
+        &bootstrap
     );
+    if (result != KERN_SUCCESS || bootstrap == MACH_PORT_NULL) {
+        return (int32_t)result;
+    }
+
+    mach_port_t service_port = MACH_PORT_NULL;
+    result = lookup(bootstrap, name, &service_port);
 
     if (result == KERN_SUCCESS && service_port != MACH_PORT_NULL) {
         mach_port_deallocate(mach_task_self(), service_port);
     }
+    mach_port_deallocate(mach_task_self(), bootstrap);
     return (int32_t)result;
 }

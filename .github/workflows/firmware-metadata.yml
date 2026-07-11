@@ -17,7 +17,11 @@ jobs:
 
       - name: Install ipsw tooling
         shell: bash
-        run: brew install blacktop/tap/ipsw
+        run: |
+          set -euo pipefail
+          brew tap blacktop/tap
+          brew trust blacktop/tap
+          brew install --formula blacktop/tap/ipsw
 
       - name: Query AppleDB for exact target
         shell: bash
@@ -40,4 +44,3 @@ jobs:
           path: firmware-metadata.json
           if-no-files-found: error
           retention-days: 14
-
