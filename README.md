@@ -1,7 +1,7 @@
 # Aegis27
 
 Aegis27 is an iOS 27 research harness for a personally owned iPhone 16
-(`iPhone17,3`). It establishes a reproducible baseline for MobileGestalt reads,
+(`iPhone17,3`) running build `24A5380h`. It establishes a reproducible baseline for MobileGestalt reads,
 strict-folder capability probes, one-shot write canaries, device/build locking,
 and structured evidence collection.
 
@@ -15,7 +15,9 @@ on the exact target build.
 
 ## Safety behavior
 
-- Mutation testing is locked to `iPhone17,3` on iOS 27.
+- Mutation testing is locked to `iPhone17,3` on iOS 27 build `24A5380h`.
+- The exported log includes MobileGestalt values and syscall-level sandbox
+  policy decisions for candidate paths and Mach services.
 - Strict-folder writes use a random `O_EXCL`-style canary and immediately remove
   only that exact file.
 - Existing files are never overwritten, truncated, renamed, or deleted.
@@ -48,4 +50,3 @@ xcodebuild -project Aegis27.xcodeproj -scheme Aegis27 -sdk iphoneos build
 Capture the complete iOS beta build number from the app, export the baseline
 JSONL log, and validate candidate primitives against a harmless canary before
 allowing any MobileGestalt cache mutation.
-

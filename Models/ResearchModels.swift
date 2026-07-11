@@ -38,7 +38,9 @@ struct DeviceProfile: Codable {
     let majorVersion: Int
 
     var isAuthorizedTarget: Bool {
-        hardwareIdentifier == "iPhone17,3" && majorVersion == 27
+        hardwareIdentifier == "iPhone17,3" &&
+        majorVersion == 27 &&
+        buildVersion == "24A5380h"
     }
 
     var targetDescription: String {
@@ -84,3 +86,31 @@ struct CanaryWriteResult: Codable {
     let errorDescription: String?
 }
 
+enum SandboxPolicySubjectKind: String, Codable {
+    case path
+    case machService
+}
+
+struct SandboxPolicyResult: Identifiable, Codable {
+    let id: UUID
+    let kind: SandboxPolicySubjectKind
+    let subject: String
+    let operation: String
+    let rawResult: Int32
+
+    init(
+        kind: SandboxPolicySubjectKind,
+        subject: String,
+        operation: String,
+        rawResult: Int32
+    ) {
+        self.id = UUID()
+        self.kind = kind
+        self.subject = subject
+        self.operation = operation
+        self.rawResult = rawResult
+    }
+
+    var apiAvailable: Bool { rawResult != Int32.min }
+    var allowed: Bool { apiAvailable && rawResult == 0 }
+}

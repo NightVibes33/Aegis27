@@ -4,7 +4,7 @@ Target owner: Bobby Tatum
 
 Target device: personally owned `iPhone17,3` (iPhone 16)
 
-Target software: iOS 27 developer beta 3
+Target software: iOS 27 developer beta 3, build `24A5380h`
 
 Purpose: good-faith vulnerability research, controlled proof-of-concept
 validation, remediation research, and responsible disclosure.
@@ -19,4 +19,3 @@ validation, remediation research, and responsible disclosure.
 - Record the complete build number with every result.
 - Report newly discovered Apple vulnerabilities through Apple's security
   reporting process before public operational release.
-

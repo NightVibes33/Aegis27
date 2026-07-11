@@ -27,10 +27,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nightvibes33.Aegis27
         PRODUCT_NAME: Aegis27
+        SWIFT_OBJC_BRIDGING_HEADER: Services/ResearchBridge.h
         CURRENT_PROJECT_VERSION: 1
-        MARKETING_VERSION: 0.1.0
+        MARKETING_VERSION: 0.2.0
         CODE_SIGN_STYLE: Automatic
         ASSETCATALOG_COMPILER_APPICON_NAME: ""
     scheme:
       gatherCoverageData: false
-

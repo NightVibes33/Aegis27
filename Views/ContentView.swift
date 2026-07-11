@@ -11,6 +11,7 @@ struct ContentView: View {
                 primitiveSection
                 gestaltSection
                 filesystemSection
+                sandboxPolicySection
                 canarySection
                 logSection
             }
@@ -45,7 +46,7 @@ struct ContentView: View {
             LabeledContent("Build", value: viewModel.profile.buildVersion)
             Label(
                 viewModel.profile.isAuthorizedTarget
-                    ? "iPhone 16 / iOS 27 target matched"
+                    ? "iPhone 16 / iOS 27 DB3 target matched"
                     : "Target mismatch — mutations blocked",
                 systemImage: viewModel.profile.isAuthorizedTarget
                     ? "checkmark.shield.fill"
@@ -93,6 +94,32 @@ struct ContentView: View {
                     }
                 }
                 .padding(.vertical, 3)
+            }
+        }
+    }
+
+    private var sandboxPolicySection: some View {
+        Section("Sandbox policy inventory") {
+            let available = viewModel.sandboxPolicyResults.filter(\.apiAvailable)
+            let allowed = available.filter(\.allowed)
+
+            LabeledContent("Checks", value: String(available.count))
+            LabeledContent("Allowed", value: String(allowed.count))
+
+            if allowed.isEmpty {
+                Text("No candidate protected-path or Mach-service operation was allowed.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(allowed) { result in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(result.operation)
+                            .font(.caption.weight(.semibold))
+                        Text(result.subject)
+                            .font(.caption2.monospaced())
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
     }

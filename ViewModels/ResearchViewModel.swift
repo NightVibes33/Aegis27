@@ -5,6 +5,7 @@ final class ResearchViewModel: ObservableObject {
     @Published private(set) var profile = DeviceProfiler.current()
     @Published private(set) var gestaltValues: [MobileGestaltValue] = []
     @Published private(set) var capabilityResults: [CapabilityProbeResult] = []
+    @Published private(set) var sandboxPolicyResults: [SandboxPolicyResult] = []
     @Published var isWriteTestingArmed = false
     @Published var selectedCanaryTarget = FileCapabilityProbe.researchTargets[0]
     @Published private(set) var primitiveSummary = "Not validated"
@@ -17,12 +18,13 @@ final class ResearchViewModel: ObservableObject {
         profile = DeviceProfiler.current()
         gestaltValues = MobileGestaltReader.readBaseline()
         capabilityResults = canaryTargets.map(FileCapabilityProbe.inspect(path:))
+        sandboxPolicyResults = SandboxPolicyProbe.run()
 
         logger.record(ResearchEvent(
             severity: profile.isAuthorizedTarget ? .success : .warning,
             subsystem: "target",
             message: profile.isAuthorizedTarget
-                ? "Authorized target profile matched"
+                ? "Exact authorized target profile matched"
                 : "Target profile mismatch; write tests remain blocked",
             details: [
                 "hardware": profile.hardwareIdentifier,
@@ -30,6 +32,20 @@ final class ResearchViewModel: ObservableObject {
                 "build": profile.buildVersion
             ]
         ))
+
+        for value in gestaltValues {
+            logger.record(ResearchEvent(
+                severity: value.available ? .success : .info,
+                subsystem: "mobilegestalt",
+                message: value.available
+                    ? "MobileGestalt value read"
+                    : "MobileGestalt value unavailable",
+                details: [
+                    "key": value.key,
+                    "value": value.value
+                ]
+            ))
+        }
 
         for result in capabilityResults {
             logger.record(ResearchEvent(
@@ -41,6 +57,23 @@ final class ResearchViewModel: ObservableObject {
                     "readable": String(result.readable),
                     "writable": String(result.writableAccordingToMetadata),
                     "error": result.errorDescription ?? "none"
+                ]
+            ))
+        }
+
+        for result in sandboxPolicyResults {
+            logger.record(ResearchEvent(
+                severity: result.allowed ? .warning : .info,
+                subsystem: "sandbox-policy",
+                message: result.allowed
+                    ? "Sandbox policy allows operation"
+                    : "Sandbox policy denies operation",
+                details: [
+                    "kind": result.kind.rawValue,
+                    "subject": result.subject,
+                    "operation": result.operation,
+                    "rawResult": String(result.rawResult),
+                    "apiAvailable": String(result.apiAvailable)
                 ]
             ))
         }
@@ -96,4 +129,3 @@ final class ResearchViewModel: ObservableObject {
         capabilityResults = canaryTargets.map(FileCapabilityProbe.inspect(path:))
     }
 }
-
