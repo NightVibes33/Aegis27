@@ -6,5 +6,10 @@
 int32_t aegis_sandbox_check_path(const char *operation, const char *path);
 int32_t aegis_sandbox_check_global_name(const char *operation, const char *name);
 int32_t aegis_bootstrap_lookup_service(const char *name);
+int32_t aegis_bootstrap_probe_service(
+    const char *name,
+    uint32_t *port_type,
+    uint32_t *send_right_refs
+);
 
 #endif

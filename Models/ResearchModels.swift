@@ -132,27 +132,22 @@ struct MachServiceLookupResult: Identifiable, Codable {
 struct MachServiceConnectionResult: Identifiable, Codable {
     let id: UUID
     let service: String
-    let resumed: Bool
-    let interrupted: Bool
-    let invalidated: Bool
-    let errorDescription: String?
+    let lookupResult: Int32
+    let portType: UInt32
+    let sendRightRefs: UInt32
 
     init(
         service: String,
-        resumed: Bool,
-        interrupted: Bool,
-        invalidated: Bool,
-        errorDescription: String?
+        lookupResult: Int32,
+        portType: UInt32,
+        sendRightRefs: UInt32
     ) {
         self.id = UUID()
         self.service = service
-        self.resumed = resumed
-        self.interrupted = interrupted
-        self.invalidated = invalidated
-        self.errorDescription = errorDescription
+        self.lookupResult = lookupResult
+        self.portType = portType
+        self.sendRightRefs = sendRightRefs
     }
 
-    var stableAfterResume: Bool {
-        resumed && !interrupted && !invalidated && errorDescription == nil
-    }
+    var resolved: Bool { lookupResult == 0 }
 }

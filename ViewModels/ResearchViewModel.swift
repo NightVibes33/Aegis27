@@ -108,17 +108,16 @@ final class ResearchViewModel: ObservableObject {
 
             for result in connectionResults {
                 logger.record(ResearchEvent(
-                    severity: result.stableAfterResume ? .warning : .info,
+                    severity: result.resolved ? .warning : .info,
                     subsystem: "xpc-connection",
-                    message: result.stableAfterResume
-                        ? "Mach service connection stayed stable after resume"
-                        : "Mach service connection interrupted or invalidated",
+                    message: result.resolved
+                        ? "Mach service port inspected"
+                        : "Mach service port inspection failed",
                     details: [
                         "service": result.service,
-                        "resumed": String(result.resumed),
-                        "interrupted": String(result.interrupted),
-                        "invalidated": String(result.invalidated),
-                        "error": result.errorDescription ?? "none"
+                        "lookupResult": String(result.lookupResult),
+                        "portType": String(result.portType),
+                        "sendRightRefs": String(result.sendRightRefs)
                     ]
                 ))
             }

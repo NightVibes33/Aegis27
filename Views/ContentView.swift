@@ -149,18 +149,18 @@ struct ContentView: View {
     }
 
     private var xpcConnectionSection: some View {
-        Section("XPC connection lifecycle") {
+        Section("Mach port lifecycle") {
             if viewModel.machConnectionResults.isEmpty {
-                Text("Refresh runs lifecycle probes for services that resolve through bootstrap.")
+                Text("Refresh inspects and releases service ports that resolve through bootstrap.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(viewModel.machConnectionResults) { result in
                     HStack {
-                        Image(systemName: result.stableAfterResume
+                        Image(systemName: result.resolved
                             ? "checkmark.circle.fill"
                             : "exclamationmark.circle")
-                            .foregroundStyle(result.stableAfterResume ? .orange : .secondary)
+                            .foregroundStyle(result.resolved ? .orange : .secondary)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(result.service)
                                 .font(.caption.monospaced())
@@ -175,23 +175,10 @@ struct ContentView: View {
     }
 
     private func connectionStatus(for result: MachServiceConnectionResult) -> String {
-        if let error = result.errorDescription {
-            return error
+        if result.resolved {
+            return "type \(result.portType) • send refs \(result.sendRightRefs) • released"
         }
-
-        if result.stableAfterResume {
-            return "Stable after resume"
-        }
-
-        if result.invalidated {
-            return "Invalidated"
-        }
-
-        if result.interrupted {
-            return "Interrupted"
-        }
-
-        return "No stable connection signal"
+        return "Lookup error \(result.lookupResult)"
     }
 
     private var canarySection: some View {

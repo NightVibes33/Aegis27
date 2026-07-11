@@ -86,3 +86,62 @@ int32_t aegis_bootstrap_lookup_service(const char *name) {
     mach_port_deallocate(mach_task_self(), bootstrap);
     return (int32_t)result;
 }
+
+int32_t aegis_bootstrap_probe_service(
+    const char *name,
+    uint32_t *port_type,
+    uint32_t *send_right_refs
+) {
+    if (name == NULL || port_type == NULL || send_right_refs == NULL) {
+        return KERN_INVALID_ARGUMENT;
+    }
+
+    *port_type = 0;
+    *send_right_refs = 0;
+
+    bootstrap_lookup_function lookup =
+        (bootstrap_lookup_function)dlsym(RTLD_DEFAULT, "bootstrap_look_up");
+    if (lookup == NULL) {
+        return KERN_NOT_SUPPORTED;
+    }
+
+    mach_port_t bootstrap = MACH_PORT_NULL;
+    kern_return_t result = task_get_special_port(
+        mach_task_self(),
+        4,
+        &bootstrap
+    );
+    if (result != KERN_SUCCESS || bootstrap == MACH_PORT_NULL) {
+        return (int32_t)result;
+    }
+
+    mach_port_t service_port = MACH_PORT_NULL;
+    result = lookup(bootstrap, name, &service_port);
+    if (result == KERN_SUCCESS && service_port != MACH_PORT_NULL) {
+        mach_port_type_t type = 0;
+        mach_port_urefs_t refs = 0;
+        kern_return_t type_result = mach_port_type(
+            mach_task_self(),
+            service_port,
+            &type
+        );
+        if (type_result == KERN_SUCCESS) {
+            *port_type = (uint32_t)type;
+        }
+
+        kern_return_t refs_result = mach_port_get_refs(
+            mach_task_self(),
+            service_port,
+            MACH_PORT_RIGHT_SEND,
+            &refs
+        );
+        if (refs_result == KERN_SUCCESS) {
+            *send_right_refs = (uint32_t)refs;
+        }
+
+        mach_port_deallocate(mach_task_self(), service_port);
+    }
+
+    mach_port_deallocate(mach_task_self(), bootstrap);
+    return (int32_t)result;
+}
