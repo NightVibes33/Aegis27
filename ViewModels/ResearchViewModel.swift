@@ -7,6 +7,7 @@ final class ResearchViewModel: ObservableObject {
     @Published private(set) var capabilityResults: [CapabilityProbeResult] = []
     @Published private(set) var sandboxPolicyResults: [SandboxPolicyResult] = []
     @Published private(set) var machServiceResults: [MachServiceLookupResult] = []
+    @Published private(set) var machConnectionResults: [MachServiceConnectionResult] = []
     @Published var isWriteTestingArmed = false
     @Published var selectedCanaryTarget = FileCapabilityProbe.researchTargets[0]
     @Published private(set) var primitiveSummary = "Not validated"
@@ -21,6 +22,7 @@ final class ResearchViewModel: ObservableObject {
         capabilityResults = canaryTargets.map(FileCapabilityProbe.inspect(path:))
         sandboxPolicyResults = SandboxPolicyProbe.run()
         machServiceResults = MachServiceReachabilityProbe.run()
+        machConnectionResults = []
 
         logger.record(ResearchEvent(
             severity: profile.isAuthorizedTarget ? .success : .warning,
@@ -96,6 +98,31 @@ final class ResearchViewModel: ObservableObject {
         }
 
         Task {
+            let reachableServices = machServiceResults
+                .filter(\.reachable)
+                .map(\.service)
+            let connectionResults = await MachServiceConnectionProbe.run(
+                services: reachableServices
+            )
+            machConnectionResults = connectionResults
+
+            for result in connectionResults {
+                logger.record(ResearchEvent(
+                    severity: result.stableAfterResume ? .warning : .info,
+                    subsystem: "xpc-connection",
+                    message: result.stableAfterResume
+                        ? "Mach service connection stayed stable after resume"
+                        : "Mach service connection interrupted or invalidated",
+                    details: [
+                        "service": result.service,
+                        "resumed": String(result.resumed),
+                        "interrupted": String(result.interrupted),
+                        "invalidated": String(result.invalidated),
+                        "error": result.errorDescription ?? "none"
+                    ]
+                ))
+            }
+
             let validation = await primitive.validate()
             primitiveSummary = validation.summary
             logger.record(ResearchEvent(
