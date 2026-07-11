@@ -2,6 +2,8 @@
 
 #include <dlfcn.h>
 #include <limits.h>
+#include <mach/mach.h>
+#include <servers/bootstrap.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -48,3 +50,20 @@ int32_t aegis_sandbox_check_global_name(const char *operation, const char *name)
     );
 }
 
+int32_t aegis_bootstrap_lookup_service(const char *name) {
+    if (name == NULL) {
+        return KERN_INVALID_ARGUMENT;
+    }
+
+    mach_port_t service_port = MACH_PORT_NULL;
+    kern_return_t result = bootstrap_look_up(
+        bootstrap_port,
+        (char *)name,
+        &service_port
+    );
+
+    if (result == KERN_SUCCESS && service_port != MACH_PORT_NULL) {
+        mach_port_deallocate(mach_task_self(), service_port);
+    }
+    return (int32_t)result;
+}

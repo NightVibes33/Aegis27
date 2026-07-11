@@ -21,7 +21,7 @@ enum SandboxPolicyProbe {
     // Candidate names are policy probes, not claims that every service exists
     // on this build. An allowed mach-lookup rule is only a lead for later
     // interface inventory; it is not itself a vulnerability.
-    private static let machServices = [
+    static let machServices = [
         "com.apple.mobilegestalt.xpc",
         "com.apple.cfprefsd.daemon",
         "com.apple.cfprefsd.agent",
@@ -69,3 +69,13 @@ enum SandboxPolicyProbe {
     }
 }
 
+enum MachServiceReachabilityProbe {
+    static func run() -> [MachServiceLookupResult] {
+        SandboxPolicyProbe.machServices.map { service in
+            let raw = service.withCString { pointer in
+                aegis_bootstrap_lookup_service(pointer)
+            }
+            return MachServiceLookupResult(service: service, rawResult: raw)
+        }
+    }
+}

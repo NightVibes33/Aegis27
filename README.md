@@ -18,6 +18,8 @@ on the exact target build.
 - Mutation testing is locked to `iPhone17,3` on iOS 27 build `24A5380h`.
 - The exported log includes MobileGestalt values and syscall-level sandbox
   policy decisions for candidate paths and Mach services.
+- Bootstrap lookups distinguish services that merely have an allowed policy
+  rule from services that actually resolve on the target build.
 - Strict-folder writes use a random `O_EXCL`-style canary and immediately remove
   only that exact file.
 - Existing files are never overwritten, truncated, renamed, or deleted.

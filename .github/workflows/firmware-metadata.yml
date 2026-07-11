@@ -1,0 +1,43 @@
+name: Resolve target firmware
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    runs-on: macos-26
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install ipsw tooling
+        shell: bash
+        run: brew install blacktop/tap/ipsw
+
+      - name: Query AppleDB for exact target
+        shell: bash
+        run: |
+          set -euo pipefail
+          ipsw --no-color download appledb \
+            --os iOS \
+            --beta \
+            --build 24A5380h \
+            --device iPhone17,3 \
+            --urls \
+            --json | tee firmware-metadata.json
+          test -s firmware-metadata.json
+          grep -q '24A5380h' firmware-metadata.json
+
+      - name: Upload firmware metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: iPhone17,3-24A5380h-firmware-metadata
+          path: firmware-metadata.json
+          if-no-files-found: error
+          retention-days: 14
+

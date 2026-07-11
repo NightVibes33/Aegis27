@@ -12,6 +12,7 @@ struct ContentView: View {
                 gestaltSection
                 filesystemSection
                 sandboxPolicySection
+                machServiceSection
                 canarySection
                 logSection
             }
@@ -117,6 +118,28 @@ struct ContentView: View {
                             .font(.caption.weight(.semibold))
                         Text(result.subject)
                             .font(.caption2.monospaced())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private var machServiceSection: some View {
+        Section("Mach service resolution") {
+            ForEach(viewModel.machServiceResults) { result in
+                HStack {
+                    Image(systemName: result.reachable
+                        ? "checkmark.circle.fill"
+                        : "xmark.circle")
+                        .foregroundStyle(result.reachable ? .orange : .secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(result.service)
+                            .font(.caption.monospaced())
+                        Text(result.reachable
+                            ? "Resolved"
+                            : "Lookup error \(result.rawResult)")
+                            .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
                 }

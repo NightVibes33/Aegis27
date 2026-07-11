@@ -114,3 +114,17 @@ struct SandboxPolicyResult: Identifiable, Codable {
     var apiAvailable: Bool { rawResult != Int32.min }
     var allowed: Bool { apiAvailable && rawResult == 0 }
 }
+
+struct MachServiceLookupResult: Identifiable, Codable {
+    let id: UUID
+    let service: String
+    let rawResult: Int32
+
+    init(service: String, rawResult: Int32) {
+        self.id = UUID()
+        self.service = service
+        self.rawResult = rawResult
+    }
+
+    var reachable: Bool { rawResult == 0 }
+}

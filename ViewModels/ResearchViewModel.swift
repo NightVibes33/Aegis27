@@ -6,6 +6,7 @@ final class ResearchViewModel: ObservableObject {
     @Published private(set) var gestaltValues: [MobileGestaltValue] = []
     @Published private(set) var capabilityResults: [CapabilityProbeResult] = []
     @Published private(set) var sandboxPolicyResults: [SandboxPolicyResult] = []
+    @Published private(set) var machServiceResults: [MachServiceLookupResult] = []
     @Published var isWriteTestingArmed = false
     @Published var selectedCanaryTarget = FileCapabilityProbe.researchTargets[0]
     @Published private(set) var primitiveSummary = "Not validated"
@@ -19,6 +20,7 @@ final class ResearchViewModel: ObservableObject {
         gestaltValues = MobileGestaltReader.readBaseline()
         capabilityResults = canaryTargets.map(FileCapabilityProbe.inspect(path:))
         sandboxPolicyResults = SandboxPolicyProbe.run()
+        machServiceResults = MachServiceReachabilityProbe.run()
 
         logger.record(ResearchEvent(
             severity: profile.isAuthorizedTarget ? .success : .warning,
@@ -74,6 +76,21 @@ final class ResearchViewModel: ObservableObject {
                     "operation": result.operation,
                     "rawResult": String(result.rawResult),
                     "apiAvailable": String(result.apiAvailable)
+                ]
+            ))
+        }
+
+        for result in machServiceResults {
+            logger.record(ResearchEvent(
+                severity: result.reachable ? .warning : .info,
+                subsystem: "mach-service",
+                message: result.reachable
+                    ? "Mach service resolved through bootstrap"
+                    : "Mach service lookup failed",
+                details: [
+                    "service": result.service,
+                    "rawResult": String(result.rawResult),
+                    "reachable": String(result.reachable)
                 ]
             ))
         }
