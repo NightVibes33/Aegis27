@@ -1,0 +1,109 @@
+name: Diff exact iPhone17,3 firmware
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/device-firmware-diff.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diff:
+    runs-on: macos-26
+    timeout-minutes: 180
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install ipsw tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew tap blacktop/tap
+          brew trust blacktop/tap
+          brew install --formula blacktop/tap/ipsw
+          ipsw version
+
+      - name: Download exact iPhone17,3 IPSWs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p firmware
+          ipsw --no-color download appledb \
+            --os iOS \
+            --type ipsw \
+            --device iPhone17,3 \
+            --build 24A5370h \
+            --output firmware \
+            --confirm
+          ipsw --no-color download appledb \
+            --os iOS \
+            --type ipsw \
+            --device iPhone17,3 \
+            --build 24A5380h \
+            --output firmware \
+            --confirm
+
+          OLD_IPSW="$(find firmware -type f -name '*24A5370h*.ipsw' -print -quit)"
+          NEW_IPSW="$(find firmware -type f -name '*24A5380h*.ipsw' -print -quit)"
+          test -n "$OLD_IPSW"
+          test -n "$NEW_IPSW"
+          echo "OLD_IPSW=$OLD_IPSW" >> "$GITHUB_ENV"
+          echo "NEW_IPSW=$NEW_IPSW" >> "$GITHUB_ENV"
+          shasum -a 256 "$OLD_IPSW" "$NEW_IPSW" | tee firmware/SHA256SUMS
+
+      - name: Generate full device-matched diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p report
+          ipsw --no-color diff "$OLD_IPSW" "$NEW_IPSW" \
+            --fw \
+            --launchd \
+            --ent \
+            --sandbox \
+            --files \
+            --starts \
+            --strs \
+            --cache-max-size 20GiB \
+            --output report \
+            --markdown \
+            --title 'iPhone17,3 iOS 27 24A5370h vs 24A5380h'
+
+      - name: Extract focused research index
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo '# iPhone17,3 focused firmware-diff index'
+            echo
+            echo 'Terms: MobileGestalt, bookassetd, mobileassetd, cfprefsd, sandbox, restore'
+            echo
+            rg -n -i \
+              'MobileGestalt|bookassetd|mobileassetd|cfprefsd|sparserestore|bookrestore|sandbox' \
+              report || true
+          } > report/focused-index.txt
+          cp firmware/SHA256SUMS report/IPSW-SHA256SUMS
+
+      - name: Package report
+        shell: bash
+        run: |
+          set -euo pipefail
+          ditto -c -k --sequesterRsrc --keepParent \
+            report iPhone17,3-24A5370h-vs-24A5380h-diff.zip
+          shasum -a 256 iPhone17,3-24A5370h-vs-24A5380h-diff.zip \
+            > iPhone17,3-24A5370h-vs-24A5380h-diff.zip.sha256
+
+      - name: Upload device-matched diff
+        uses: actions/upload-artifact@v4
+        with:
+          name: iPhone17,3-24A5370h-vs-24A5380h-diff
+          path: |
+            iPhone17,3-24A5370h-vs-24A5380h-diff.zip
+            iPhone17,3-24A5370h-vs-24A5380h-diff.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
