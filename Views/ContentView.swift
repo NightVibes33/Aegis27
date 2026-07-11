@@ -13,6 +13,7 @@ struct ContentView: View {
                 filesystemSection
                 sandboxPolicySection
                 machServiceSection
+                xpcConnectionSection
                 canarySection
                 logSection
             }
@@ -145,6 +146,52 @@ struct ContentView: View {
                 }
             }
         }
+    }
+
+    private var xpcConnectionSection: some View {
+        Section("XPC connection lifecycle") {
+            if viewModel.machConnectionResults.isEmpty {
+                Text("Refresh runs lifecycle probes for services that resolve through bootstrap.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(viewModel.machConnectionResults) { result in
+                    HStack {
+                        Image(systemName: result.stableAfterResume
+                            ? "checkmark.circle.fill"
+                            : "exclamationmark.circle")
+                            .foregroundStyle(result.stableAfterResume ? .orange : .secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(result.service)
+                                .font(.caption.monospaced())
+                            Text(connectionStatus(for: result))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func connectionStatus(for result: MachServiceConnectionResult) -> String {
+        if let error = result.errorDescription {
+            return error
+        }
+
+        if result.stableAfterResume {
+            return "Stable after resume"
+        }
+
+        if result.invalidated {
+            return "Invalidated"
+        }
+
+        if result.interrupted {
+            return "Interrupted"
+        }
+
+        return "No stable connection signal"
     }
 
     private var canarySection: some View {
