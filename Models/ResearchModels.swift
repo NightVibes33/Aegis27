@@ -128,3 +128,31 @@ struct MachServiceLookupResult: Identifiable, Codable {
 
     var reachable: Bool { rawResult == 0 }
 }
+
+struct MachServiceConnectionResult: Identifiable, Codable {
+    let id: UUID
+    let service: String
+    let resumed: Bool
+    let interrupted: Bool
+    let invalidated: Bool
+    let errorDescription: String?
+
+    init(
+        service: String,
+        resumed: Bool,
+        interrupted: Bool,
+        invalidated: Bool,
+        errorDescription: String?
+    ) {
+        self.id = UUID()
+        self.service = service
+        self.resumed = resumed
+        self.interrupted = interrupted
+        self.invalidated = invalidated
+        self.errorDescription = errorDescription
+    }
+
+    var stableAfterResume: Bool {
+        resumed && !interrupted && !invalidated && errorDescription == nil
+    }
+}
