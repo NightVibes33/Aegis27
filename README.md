@@ -26,6 +26,25 @@ The runtime capability matrix replaces model/build allowlisting. This lets the
 same IPA collect evidence on normal retail devices, betas, and authorized
 research devices without claiming that any environment is privileged.
 
+## v0.6 file-provider workflow
+
+The **Files** tab adds the parts of the filesystem research architecture that
+can operate without an escape:
+
+- a common `FileAccessProvider` boundary;
+- a working stock-sandbox provider;
+- a fail-closed escaped-provider placeholder;
+- provider capability validation based on real operations;
+- read-only directory navigation and current-directory filtering;
+- bounded 64 KiB text previews and 512-byte hex previews;
+- symbolic-link refusal;
+- a MobileGestalt/system target catalog; and
+- metadata-only personal-data targets that require explicit opt-in.
+
+The browser does not claim that an allowed sandbox-policy rule is successful
+filesystem access. Each metadata, listing, and read operation is measured
+through the selected provider.
+
 ## Safety behavior
 
 - The target model, OS version, and build are recorded, not hard-coded.

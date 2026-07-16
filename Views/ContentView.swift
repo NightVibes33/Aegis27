@@ -8,6 +8,19 @@ struct ContentView: View {
     private let buildIdentity = AppBuildIdentity.current
 
     var body: some View {
+        TabView {
+            researchDashboard
+                .tabItem {
+                    Label("Research", systemImage: "waveform.path.ecg")
+                }
+            FileBrowserView()
+                .tabItem {
+                    Label("Files", systemImage: "folder")
+                }
+        }
+    }
+
+    private var researchDashboard: some View {
         NavigationStack {
             List {
                 targetSection

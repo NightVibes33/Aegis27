@@ -16,6 +16,13 @@ The shipping baseline has no sandbox escape.
 7. `PrivilegedAccessPrimitive` is the only integration boundary for future
    vulnerability research. The current implementation is deliberately inert.
 8. `AuditLogger` records every probe and mutation attempt as exportable JSONL.
+9. `FileAccessProvider` separates browser behavior from how filesystem access
+   is obtained. `StockFileAccessProvider` is functional; the escaped provider
+   fails closed until an independently validated primitive is integrated.
+10. `ProviderCapabilityValidator` distinguishes metadata, directory listing,
+    and bounded file-read results instead of treating policy checks as access.
+11. `FileResearchTargetCatalog` keeps personal-data targets disabled by
+    default and performs metadata-only inventory when they are enabled.
 
 ## Jailbreak prerequisite map
 
