@@ -3,7 +3,8 @@ import Foundation
 @MainActor
 final class DeepScanViewModel: ObservableObject {
     @Published var selectedProvider = FileProviderKind.stock
-    @Published var maximumNodes = 1_000
+    @Published var scanAllReachablePaths = true
+    @Published var maximumNodes = 25_000
     @Published var maximumDepth = 8
     @Published var includeReadProbe = true
     @Published var includeWriteProbe = false
@@ -44,11 +45,11 @@ final class DeepScanViewModel: ObservableObject {
         isRunning = true
         let provider = selectedProvider
         let configuration = DeepScanConfiguration(
-            maximumNodes: maximumNodes,
-            maximumDepth: maximumDepth,
+            maximumNodes: scanAllReachablePaths ? 0 : maximumNodes,
+            maximumDepth: scanAllReachablePaths ? 0 : maximumDepth,
             includeReadProbe: includeReadProbe,
             includeWriteProbe: includeWriteProbe,
-            maximumWriteProbes: min(maximumNodes, 100)
+            maximumWriteProbes: scanAllReachablePaths ? 0 : 100
         )
 
         scanTask = Task {

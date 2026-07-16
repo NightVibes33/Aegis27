@@ -1,11 +1,14 @@
 import Foundation
 
 struct DeepScanConfiguration: Codable {
-    var maximumNodes = 1_000
-    var maximumDepth = 8
+    /// Zero means continue until every reachable queue is exhausted.
+    var maximumNodes = 0
+    /// Zero means descend until the reachable tree is exhausted.
+    var maximumDepth = 0
     var includeReadProbe = true
     var includeWriteProbe = false
-    var maximumWriteProbes = 100
+    /// Zero means probe every discovered directory.
+    var maximumWriteProbes = 0
 }
 
 struct DeepScanObservation: Identifiable, Codable {
@@ -41,7 +44,17 @@ struct DeepScanReport: Codable {
         observations.filter { $0.metadataOutcome == .success }.count
     }
 
-    var readableCount: Int { observations.filter(\.readable).count }
+    /// Files whose contents were actually opened and read by the probe.
+    var readableFileCount: Int {
+        observations.filter { $0.readOutcome == .success }.count
+    }
+
+    /// Directories whose children were actually enumerated.
+    var listableDirectoryCount: Int {
+        observations.filter { $0.listingOutcome == .success }.count
+    }
+
+    var accessibleCount: Int { observations.filter(\.readable).count }
     var writableCount: Int { observations.filter(\.writable).count }
     var deniedCount: Int {
         observations.filter {

@@ -28,7 +28,9 @@ struct DeepScanView: View {
                 Button("Cancel", role: .cancel) { }
                 Button("Run canaries", role: .destructive) { startScan() }
             } message: {
-                Text("Up to 100 discovered directories will receive a uniquely named empty canary that is immediately removed. Existing files are never modified.")
+                Text(viewModel.scanAllReachablePaths
+                    ? "Every discovered directory will receive a uniquely named empty canary that is immediately removed. Existing files are never modified. This can make the scan substantially slower."
+                    : "Up to 100 discovered directories will receive a uniquely named empty canary that is immediately removed. Existing files are never modified.")
             }
         }
     }
@@ -40,8 +42,20 @@ struct DeepScanView: View {
                     Text(provider.title).tag(provider)
                 }
             }
-            Stepper("Maximum paths: \(viewModel.maximumNodes)", value: $viewModel.maximumNodes, in: 100...5_000, step: 100)
-            Stepper("Maximum depth: \(viewModel.maximumDepth)", value: $viewModel.maximumDepth, in: 1...20)
+            Toggle("Scan all reachable paths", isOn: $viewModel.scanAllReachablePaths)
+            if !viewModel.scanAllReachablePaths {
+                Stepper(
+                    "Maximum paths: \(viewModel.maximumNodes)",
+                    value: $viewModel.maximumNodes,
+                    in: 1_000...100_000,
+                    step: 1_000
+                )
+                Stepper(
+                    "Maximum depth: \(viewModel.maximumDepth)",
+                    value: $viewModel.maximumDepth,
+                    in: 1...64
+                )
+            }
             Toggle("One-byte read probes", isOn: $viewModel.includeReadProbe)
             Toggle("Create-and-remove write canaries", isOn: $viewModel.includeWriteProbe)
 
@@ -64,7 +78,7 @@ struct DeepScanView: View {
 
     private var scopeSection: some View {
         Section("Coverage") {
-            Text("The scan starts from \(DeepScanService.seedPaths.count) system and container roots, then breadth-first traverses every directory it can list within the configured limits.")
+            Text("The scan starts from \(DeepScanService.seedPaths.count) system and container roots. It advances each root in turn so one large public tree cannot starve the others. All-reachable mode continues until every listable path is exhausted.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             Text("It does not follow symbolic links, retain file contents, send private service messages, or bypass a denied parent directory. Mach-service coverage is limited to the evidence-backed candidate catalog because the bootstrap namespace is not publicly enumerable.")
@@ -77,7 +91,9 @@ struct DeepScanView: View {
         Section("Summary") {
             LabeledContent("Paths scanned", value: String(report.observations.count))
             LabeledContent("Metadata visible", value: String(report.metadataVisibleCount))
-            LabeledContent("Readable", value: String(report.readableCount))
+            LabeledContent("Files actually read", value: String(report.readableFileCount))
+            LabeledContent("Directories listed", value: String(report.listableDirectoryCount))
+            LabeledContent("Accessible entries", value: String(report.accessibleCount))
             LabeledContent("Writable", value: String(report.writableCount))
             LabeledContent("Denied", value: String(report.deniedCount))
             LabeledContent("Services reachable", value: "\(report.reachableServiceCount) of \(report.serviceResults.count)")
@@ -170,7 +186,9 @@ struct DeepScanView: View {
                     "provider": report.provider.rawValue,
                     "paths": String(report.observations.count),
                     "metadataVisible": String(report.metadataVisibleCount),
-                    "readable": String(report.readableCount),
+                    "filesRead": String(report.readableFileCount),
+                    "directoriesListed": String(report.listableDirectoryCount),
+                    "accessible": String(report.accessibleCount),
                     "writable": String(report.writableCount),
                     "denied": String(report.deniedCount),
                     "reachableServices": String(report.reachableServiceCount),

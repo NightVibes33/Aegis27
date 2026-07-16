@@ -34,11 +34,14 @@ checks. It attempts a bounded read of
 `/var/mobile/Containers/Data/Application` to detect containers other than
 Aegis27's own. Metadata-only visibility does not count as a pass.
 
-The **Scan** mode performs a bounded breadth-first capability inventory from
-standard system, mobile-user, and container roots. It records metadata,
-directory-listing, one-byte read, and optional create-and-remove write results;
-does not retain file contents or follow symbolic links; and also repeats the
-evidence-backed Mach-service reachability inventory.
+The **Scan** mode performs a root-balanced capability inventory from standard
+system, mobile-user, and container roots. Its default all-reachable mode has no
+path or depth ceiling and advances each root in turn so a large public subtree
+cannot starve the other targets. It records metadata, directory-listing,
+one-byte read, and optional create-and-remove write results; does not retain
+file contents or follow symbolic links; and also repeats the evidence-backed
+Mach-service reachability inventory. Limited path/depth mode remains available
+for faster diagnostic runs.
 
 The **Files** tab adds the parts of the filesystem research architecture that
 can operate without an escape:
