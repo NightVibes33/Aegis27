@@ -156,6 +156,7 @@ struct StockFileAccessProvider: FileAccessProvider {
             path: path,
             isDirectory: type == .typeDirectory,
             isSymbolicLink: type == .typeSymbolicLink,
+            isRegularFile: type == .typeRegular,
             byteCount: (attributes[.size] as? NSNumber)?.int64Value,
             modificationDate: attributes[.modificationDate] as? Date,
             readable: FileManager.default.isReadableFile(atPath: path),

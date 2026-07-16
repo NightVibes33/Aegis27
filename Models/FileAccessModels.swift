@@ -20,6 +20,7 @@ struct FileEntry: Identifiable, Codable {
     let path: String
     let isDirectory: Bool
     let isSymbolicLink: Bool
+    let isRegularFile: Bool
     let byteCount: Int64?
     let modificationDate: Date?
     let readable: Bool

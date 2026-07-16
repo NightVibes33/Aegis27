@@ -28,6 +28,18 @@ research devices without claiming that any environment is privileged.
 
 ## v0.6 file-provider workflow
 
+The app also includes a dedicated **Verify** mode for decisive protected-access
+checks. It attempts a bounded read of
+`/var/mobile/Library/Preferences/com.apple.springboard.plist` and lists
+`/var/mobile/Containers/Data/Application` to detect containers other than
+Aegis27's own. Metadata-only visibility does not count as a pass.
+
+The **Scan** mode performs a bounded breadth-first capability inventory from
+standard system, mobile-user, and container roots. It records metadata,
+directory-listing, one-byte read, and optional create-and-remove write results;
+does not retain file contents or follow symbolic links; and also repeats the
+evidence-backed Mach-service reachability inventory.
+
 The **Files** tab adds the parts of the filesystem research architecture that
 can operate without an escape:
 

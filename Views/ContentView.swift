@@ -17,6 +17,14 @@ struct ContentView: View {
                 .tabItem {
                     Label("Files", systemImage: "folder")
                 }
+            SandboxValidationView()
+                .tabItem {
+                    Label("Verify", systemImage: "checkmark.shield")
+                }
+            DeepScanView()
+                .tabItem {
+                    Label("Scan", systemImage: "magnifyingglass.circle")
+                }
         }
     }
 
