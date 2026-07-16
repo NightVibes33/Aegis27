@@ -45,6 +45,11 @@ The browser does not claim that an allowed sandbox-policy rule is successful
 filesystem access. Each metadata, listing, and read operation is measured
 through the selected provider.
 
+Version 0.6.1 records provider selection, capability validation, target
+inventory, directory listing, and bounded-preview outcomes in the same JSONL
+audit log used by the Research tab. Preview contents are never written to the
+log.
+
 ## Safety behavior
 
 - The target model, OS version, and build are recorded, not hard-coded.
