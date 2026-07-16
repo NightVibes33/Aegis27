@@ -50,6 +50,13 @@ inventory, directory listing, and bounded-preview outcomes in the same JSONL
 audit log used by the Research tab. Preview contents are never written to the
 log.
 
+Version 0.7 presents those capabilities as a native file manager: compact
+provider status, editable address bar, tappable breadcrumbs, list/grid layouts,
+name/date/size sorting, hidden-file control, extension-aware icons, pull to
+refresh, copy-path context menus, and a dedicated preview sheet. Provider
+validation and research targets live in a separate inspector instead of
+interrupting normal browsing.
+
 ## Safety behavior
 
 - The target model, OS version, and build are recorded, not hard-coded.
