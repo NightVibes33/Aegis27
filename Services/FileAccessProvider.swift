@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 protocol FileAccessProvider {
     var kind: FileProviderKind { get }
