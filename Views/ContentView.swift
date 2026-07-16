@@ -5,6 +5,7 @@ struct ContentView: View {
     @EnvironmentObject private var viewModel: ResearchViewModel
     @State private var showCanaryConfirmation = false
     @State private var showDiagnosticImporter = false
+    private let buildIdentity = AppBuildIdentity.current
 
     var body: some View {
         NavigationStack {
@@ -61,6 +62,20 @@ struct ContentView: View {
             LabeledContent("Hardware", value: viewModel.profile.hardwareIdentifier)
             LabeledContent("iOS", value: viewModel.profile.systemVersion)
             LabeledContent("Build", value: viewModel.profile.buildVersion)
+            Label("Differential research build", systemImage: "waveform.path.ecg.rectangle.fill")
+                .font(.headline)
+                .foregroundStyle(.blue)
+            LabeledContent(
+                "App version",
+                value: "\(buildIdentity.version) (\(buildIdentity.build))"
+            )
+            LabeledContent(
+                "Source",
+                value: String(buildIdentity.sourceRevision.prefix(12))
+            )
+            Text(buildIdentity.bundleIdentifier)
+                .font(.caption2.monospaced())
+                .foregroundStyle(.secondary)
             Text("No device model or beta build is hard-coded. Capabilities are measured at runtime.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
