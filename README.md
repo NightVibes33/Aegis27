@@ -91,6 +91,36 @@ service-specific commands, attacker-selected paths, and destructive requests
 are outside this mode. A compact JSON report avoids another filesystem-sized
 export.
 
+Version 0.10 expands that mode into a bounded differential suite:
+
+- exact-build firmware catalog import with strict size, service, request, and
+  field limits;
+- three repetitions of empty and inert typed XPC dictionary schemas;
+- response fingerprints made only from reply type and dictionary key names—
+  reply values are never retained;
+- tiny valid and truncated JSON, plist, and PNG corpora measured both locally
+  and through the public QuickLook thumbnail boundary, with a two-second
+  deadline per QuickLook request;
+- an IOKit match/open-type-0/close inventory that never invokes external
+  methods;
+- `.ips`/diagnostic correlation by timestamp, process, probe identifier, and
+  security-relevant termination markers;
+- persisted cross-run and cross-boot response comparisons; and
+- protected-file and foreign-container checks after every XPC repetition and
+  after the complete suite.
+
+Generate an inert catalog from an extracted copy of the matching firmware:
+
+```sh
+python3 scripts/build_probe_catalog.py /path/to/extracted/firmware \
+  --build 24A5380h \
+  --output aegis27-probe-catalog.json
+```
+
+The generator uses firmware strings only to identify candidate dictionary
+keys. It emits a fixed inert marker value and never generates destructive
+operation values, personal-data paths, or exploit payloads.
+
 ## Safety behavior
 
 - The target model, OS version, and build are recorded, not hard-coded.

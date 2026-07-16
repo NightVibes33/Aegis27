@@ -150,7 +150,7 @@ struct ContentView: View {
             } label: {
                 Label("Probe reachable service boundaries", systemImage: "scope")
             }
-            Text("Moves beyond filesystem crawling: bounded XPC requests, response classification, reachability comparison, and automatic protected-access validation.")
+            Text("Moves beyond filesystem crawling: firmware-derived typed XPC schemas, response fingerprints, controlled parser boundaries, IOKit open-only inventory, crash correlation, repeatability checks, and automatic protected-access validation.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
