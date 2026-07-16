@@ -3,14 +3,19 @@
 Aegis27 separates ordinary app behavior from any future privileged primitive.
 The shipping baseline has no sandbox escape.
 
-1. `DeviceProfiler` locks mutation tests to `iPhone17,3` on iOS 27.
-2. `MobileGestaltReader` reads a small non-unique metadata baseline through a
+1. `DeviceProfiler` records the exact hardware, OS version, and build without
+   using them as a capability claim.
+2. `RuntimeCapabilityEvaluator` summarizes only behavior observed by the app.
+3. `SnapshotStore` persists baselines and creates stable field-level diffs.
+4. `DiagnosticImporter` hashes a selected diagnostic locally and inventories
+   markers from a bounded preview.
+5. `MobileGestaltReader` reads a small non-unique metadata baseline through a
    dynamically resolved symbol.
-3. `FileCapabilityProbe` measures normal sandbox behavior and can create a
+6. `FileCapabilityProbe` measures normal sandbox behavior and can create a
    uniquely named, one-shot canary. It never overwrites existing data.
-4. `PrivilegedAccessPrimitive` is the only integration boundary for future
+7. `PrivilegedAccessPrimitive` is the only integration boundary for future
    vulnerability research. The current implementation is deliberately inert.
-5. `AuditLogger` records every probe and mutation attempt as exportable JSONL.
+8. `AuditLogger` records every probe and mutation attempt as exportable JSONL.
 
 ## Jailbreak prerequisite map
 

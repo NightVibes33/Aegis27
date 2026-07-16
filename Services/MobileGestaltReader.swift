@@ -7,11 +7,17 @@ enum MobileGestaltReader {
 
     // These values are deliberately limited to non-unique device/build metadata.
     static let baselineKeys = [
+        "ProductName",
         "ProductType",
         "ProductVersion",
         "BuildVersion",
         "DeviceClass",
         "HardwarePlatform",
+        "CPUArchitecture",
+        "ReleaseType",
+        "IsSimulator",
+        "IsInternalBuild",
+        "MarketingProductName",
         "ArtworkDeviceProductDescription"
     ]
 
@@ -43,4 +49,3 @@ enum MobileGestaltReader {
         }
     }
 }
-

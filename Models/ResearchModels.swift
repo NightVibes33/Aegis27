@@ -37,15 +37,29 @@ struct DeviceProfile: Codable {
     let buildVersion: String
     let majorVersion: Int
 
-    var isAuthorizedTarget: Bool {
-        hardwareIdentifier == "iPhone17,3" &&
-        majorVersion == 27 &&
-        buildVersion == "24A5380h"
-    }
-
     var targetDescription: String {
         "\(hardwareIdentifier) • \(systemName) \(systemVersion) (\(buildVersion))"
     }
+}
+
+struct RuntimeCapabilitySummary: Codable {
+    let publicGestaltRead: Bool
+    let sandboxPolicyAPI: Bool
+    let appContainerWrite: Bool
+    let protectedMetadataRead: Bool
+    let protectedDataPolicyAllowed: Bool
+    let protectedWritePolicyAllowed: Bool
+    let reachableMachServices: Int
+
+    static let pending = RuntimeCapabilitySummary(
+        publicGestaltRead: false,
+        sandboxPolicyAPI: false,
+        appContainerWrite: false,
+        protectedMetadataRead: false,
+        protectedDataPolicyAllowed: false,
+        protectedWritePolicyAllowed: false,
+        reachableMachServices: 0
+    )
 }
 
 struct MobileGestaltValue: Identifiable, Codable {
@@ -150,4 +164,77 @@ struct MachServiceConnectionResult: Identifiable, Codable {
     }
 
     var resolved: Bool { lookupResult == 0 }
+}
+
+enum ResearchExperiment: String, CaseIterable, Identifiable, Codable {
+    case gestaltInventory
+    case filesystemMetadata
+    case sandboxPolicy
+    case machServices
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .gestaltInventory: return "MobileGestalt inventory"
+        case .filesystemMetadata: return "Filesystem metadata"
+        case .sandboxPolicy: return "Sandbox policy"
+        case .machServices: return "Mach service inventory"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .gestaltInventory:
+            return "Repeats the curated, non-unique read-only key inventory."
+        case .filesystemMetadata:
+            return "Checks protected-directory visibility without opening existing files."
+        case .sandboxPolicy:
+            return "Records policy decisions for the fixed path and service catalog."
+        case .machServices:
+            return "Resolves candidate services and inspects then releases returned ports."
+        }
+    }
+}
+
+struct ExperimentRecord: Identifiable, Codable {
+    let id: UUID
+    let timestamp: Date
+    let experiment: ResearchExperiment
+    let summary: String
+
+    init(experiment: ResearchExperiment, summary: String) {
+        self.id = UUID()
+        self.timestamp = Date()
+        self.experiment = experiment
+        self.summary = summary
+    }
+}
+
+struct ResearchSnapshot: Identifiable, Codable {
+    let id: UUID
+    let timestamp: Date
+    let profile: DeviceProfile
+    let runtimeCapabilities: RuntimeCapabilitySummary
+    let gestaltValues: [MobileGestaltValue]
+    let capabilityResults: [CapabilityProbeResult]
+    let sandboxPolicyResults: [SandboxPolicyResult]
+    let machServiceResults: [MachServiceLookupResult]
+    let machConnectionResults: [MachServiceConnectionResult]
+}
+
+struct SnapshotDifference: Identifiable, Codable {
+    var id: String { key }
+    let key: String
+    let previousValue: String
+    let currentValue: String
+}
+
+struct ImportedDiagnostic: Identifiable, Codable {
+    let id: UUID
+    let importedAt: Date
+    let fileName: String
+    let byteCount: Int64
+    let sha256: String
+    let signalCounts: [String: Int]
 }

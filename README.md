@@ -1,9 +1,9 @@
 # Aegis27
 
-Aegis27 is an iOS 27 research harness for a personally owned iPhone 16
-(`iPhone17,3`) running build `24A5380h`. It establishes a reproducible baseline for MobileGestalt reads,
-strict-folder capability probes, one-shot write canaries, device/build locking,
-and structured evidence collection.
+Aegis27 is an iOS research harness for measuring a device's observed runtime
+capabilities. It establishes reproducible baselines for curated MobileGestalt
+reads, strict-folder capability probes, one-shot write canaries, snapshot
+comparison, diagnostic correlation, and structured evidence collection.
 
 ## Current status
 
@@ -13,9 +13,23 @@ or persistence mechanism. It provides a safe and testable place to integrate a
 privileged primitive only after that primitive has been independently validated
 on the exact target build.
 
+## v0.5 research workflow
+
+1. Tap **Refresh** to collect the full baseline.
+2. Save an initial snapshot.
+3. Run one repeatable, non-destructive experiment.
+4. Optionally import a user-selected crash report or diagnostic file. The app
+   hashes the file locally and counts relevant markers in only the first 4 MB.
+5. Save again to see exactly which measured fields changed.
+
+The runtime capability matrix replaces model/build allowlisting. This lets the
+same IPA collect evidence on normal retail devices, betas, and authorized
+research devices without claiming that any environment is privileged.
+
 ## Safety behavior
 
-- Mutation testing is locked to `iPhone17,3` on iOS 27 build `24A5380h`.
+- The target model, OS version, and build are recorded, not hard-coded.
+- A write canary still requires explicit one-shot arming and confirmation.
 - The exported log includes MobileGestalt values and syscall-level sandbox
   policy decisions for candidate paths and Mach services.
 - Bootstrap lookups distinguish services that merely have an allowed policy
@@ -47,8 +61,9 @@ xcodegen generate
 xcodebuild -project Aegis27.xcodeproj -scheme Aegis27 -sdk iphoneos build
 ```
 
-## Next research milestone
+## Privileged primitive boundary
 
-Capture the complete iOS beta build number from the app, export the baseline
-JSONL log, and validate candidate primitives against a harmless canary before
-allowing any MobileGestalt cache mutation.
+The `PrivilegedAccessPrimitive` protocol is the integration boundary for a
+future, independently validated capability. Aegis27 does not manufacture or
+simulate that capability. Protected MobileGestalt mutation remains unavailable
+until a real primitive has been validated against the harmless canary.

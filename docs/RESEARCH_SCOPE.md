@@ -2,7 +2,9 @@
 
 Target owner: Bobby Tatum
 
-Target device: personally owned `iPhone17,3` (iPhone 16)
+Primary test device: personally owned `iPhone17,3` (iPhone 16). The harness is
+not model-locked and may collect the same non-destructive baseline on other
+devices.
 
 Target software: iOS 27 developer beta 3, build `24A5380h`
 

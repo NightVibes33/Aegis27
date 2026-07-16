@@ -8,6 +8,13 @@ final class ResearchViewModel: ObservableObject {
     @Published private(set) var sandboxPolicyResults: [SandboxPolicyResult] = []
     @Published private(set) var machServiceResults: [MachServiceLookupResult] = []
     @Published private(set) var machConnectionResults: [MachServiceConnectionResult] = []
+    @Published private(set) var runtimeCapabilities = RuntimeCapabilitySummary.pending
+    @Published private(set) var snapshotDifferences: [SnapshotDifference] = []
+    @Published private(set) var snapshotURL: URL?
+    @Published private(set) var experimentRecords: [ExperimentRecord] = []
+    @Published private(set) var importedDiagnostics: [ImportedDiagnostic] = []
+    @Published var selectedExperiment: ResearchExperiment = .gestaltInventory
+    @Published private(set) var isExperimentRunning = false
     @Published var isWriteTestingArmed = false
     @Published var selectedCanaryTarget = FileCapabilityProbe.researchTargets[0]
     @Published private(set) var primitiveSummary = "Not validated"
@@ -23,13 +30,12 @@ final class ResearchViewModel: ObservableObject {
         sandboxPolicyResults = SandboxPolicyProbe.run()
         machServiceResults = MachServiceReachabilityProbe.run()
         machConnectionResults = []
+        updateRuntimeCapabilities()
 
         logger.record(ResearchEvent(
-            severity: profile.isAuthorizedTarget ? .success : .warning,
+            severity: .success,
             subsystem: "target",
-            message: profile.isAuthorizedTarget
-                ? "Exact authorized target profile matched"
-                : "Target profile mismatch; write tests remain blocked",
+            message: "Runtime target profile captured",
             details: [
                 "hardware": profile.hardwareIdentifier,
                 "version": profile.systemVersion,
@@ -105,6 +111,7 @@ final class ResearchViewModel: ObservableObject {
                 services: reachableServices
             )
             machConnectionResults = connectionResults
+            updateRuntimeCapabilities()
 
             for result in connectionResults {
                 logger.record(ResearchEvent(
@@ -134,16 +141,6 @@ final class ResearchViewModel: ObservableObject {
     }
 
     func runCanaryWrite() {
-        guard profile.isAuthorizedTarget else {
-            logger.record(ResearchEvent(
-                severity: .failure,
-                subsystem: "canary",
-                message: "Blocked canary write because target profile does not match",
-                details: ["target": profile.targetDescription]
-            ))
-            return
-        }
-
         guard isWriteTestingArmed else {
             logger.record(ResearchEvent(
                 severity: .warning,
@@ -170,5 +167,133 @@ final class ResearchViewModel: ObservableObject {
 
         isWriteTestingArmed = false
         capabilityResults = canaryTargets.map(FileCapabilityProbe.inspect(path:))
+        sandboxPolicyResults = SandboxPolicyProbe.run()
+        updateRuntimeCapabilities()
+    }
+
+    func runSelectedExperiment() {
+        guard !isExperimentRunning else { return }
+        isExperimentRunning = true
+
+        switch selectedExperiment {
+        case .gestaltInventory:
+            gestaltValues = MobileGestaltReader.readBaseline()
+            finishExperiment(
+                summary: "\(gestaltValues.filter(\.available).count) of \(gestaltValues.count) curated keys available"
+            )
+        case .filesystemMetadata:
+            capabilityResults = canaryTargets.map(FileCapabilityProbe.inspect(path:))
+            finishExperiment(
+                summary: "\(capabilityResults.filter(\.readable).count) of \(capabilityResults.count) protected directories readable"
+            )
+        case .sandboxPolicy:
+            sandboxPolicyResults = SandboxPolicyProbe.run()
+            finishExperiment(
+                summary: "\(sandboxPolicyResults.filter(\.allowed).count) of \(sandboxPolicyResults.filter(\.apiAvailable).count) policy checks allowed"
+            )
+        case .machServices:
+            machServiceResults = MachServiceReachabilityProbe.run()
+            Task {
+                machConnectionResults = await MachServiceConnectionProbe.run(
+                    services: machServiceResults.filter(\.reachable).map(\.service)
+                )
+                finishExperiment(
+                    summary: "\(machServiceResults.filter(\.reachable).count) services resolved; all acquired ports released"
+                )
+            }
+        }
+    }
+
+    func saveSnapshot() {
+        let previous = SnapshotStore.loadLatest()
+        let snapshot = makeSnapshot()
+        do {
+            snapshotURL = try SnapshotStore.save(snapshot)
+            snapshotDifferences = previous.map {
+                SnapshotStore.differences(previous: $0, current: snapshot)
+            } ?? []
+            logger.record(ResearchEvent(
+                severity: .success,
+                subsystem: "snapshot",
+                message: previous == nil
+                    ? "Initial research snapshot saved"
+                    : "Research snapshot saved and compared",
+                details: [
+                    "changes": String(snapshotDifferences.count),
+                    "snapshot": snapshot.id.uuidString
+                ]
+            ))
+        } catch {
+            logger.record(ResearchEvent(
+                severity: .failure,
+                subsystem: "snapshot",
+                message: "Research snapshot could not be saved",
+                details: ["error": String(describing: error)]
+            ))
+        }
+    }
+
+    func importDiagnostic(from url: URL) {
+        do {
+            let diagnostic = try DiagnosticImporter.inspect(url: url)
+            importedDiagnostics.insert(diagnostic, at: 0)
+            logger.record(ResearchEvent(
+                severity: .success,
+                subsystem: "diagnostic-import",
+                message: "Diagnostic metadata imported",
+                details: [
+                    "file": diagnostic.fileName,
+                    "bytes": String(diagnostic.byteCount),
+                    "sha256": diagnostic.sha256,
+                    "signals": String(diagnostic.signalCounts.values.reduce(0, +))
+                ]
+            ))
+        } catch {
+            logger.record(ResearchEvent(
+                severity: .failure,
+                subsystem: "diagnostic-import",
+                message: "Diagnostic import failed",
+                details: ["error": String(describing: error)]
+            ))
+        }
+    }
+
+    private func finishExperiment(summary: String) {
+        updateRuntimeCapabilities()
+        let record = ExperimentRecord(
+            experiment: selectedExperiment,
+            summary: summary
+        )
+        experimentRecords.insert(record, at: 0)
+        logger.record(ResearchEvent(
+            severity: .success,
+            subsystem: "experiment",
+            message: record.experiment.title,
+            details: ["summary": summary]
+        ))
+        isExperimentRunning = false
+    }
+
+    private func updateRuntimeCapabilities() {
+        runtimeCapabilities = RuntimeCapabilityEvaluator.evaluate(
+            gestaltValues: gestaltValues,
+            capabilityResults: capabilityResults,
+            sandboxPolicyResults: sandboxPolicyResults,
+            machServiceResults: machServiceResults
+        )
+    }
+
+    private func makeSnapshot() -> ResearchSnapshot {
+        ResearchSnapshot(
+            id: UUID(),
+            timestamp: Date(),
+            profile: profile,
+            runtimeCapabilities: runtimeCapabilities,
+            gestaltValues: gestaltValues,
+            capabilityResults: capabilityResults,
+            sandboxPolicyResults: sandboxPolicyResults,
+            machServiceResults: machServiceResults,
+            machConnectionResults: machConnectionResults
+        )
     }
 }

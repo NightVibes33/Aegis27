@@ -1,20 +1,26 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @EnvironmentObject private var viewModel: ResearchViewModel
     @State private var showCanaryConfirmation = false
+    @State private var showDiagnosticImporter = false
 
     var body: some View {
         NavigationStack {
             List {
                 targetSection
+                runtimeCapabilitySection
                 primitiveSection
+                experimentSection
                 gestaltSection
                 filesystemSection
                 sandboxPolicySection
                 machServiceSection
                 xpcConnectionSection
                 canarySection
+                snapshotSection
+                diagnosticSection
                 logSection
             }
             .navigationTitle("Aegis27")
@@ -38,23 +44,55 @@ struct ContentView: View {
             } message: {
                 Text("A unique file will be created only if access is available, then immediately deleted. Existing files are never modified.")
             }
+            .fileImporter(
+                isPresented: $showDiagnosticImporter,
+                allowedContentTypes: [.item],
+                allowsMultipleSelection: false
+            ) { result in
+                if case .success(let urls) = result, let url = urls.first {
+                    viewModel.importDiagnostic(from: url)
+                }
+            }
         }
     }
 
     private var targetSection: some View {
-        Section("Authorized target") {
+        Section("Runtime target") {
             LabeledContent("Hardware", value: viewModel.profile.hardwareIdentifier)
             LabeledContent("iOS", value: viewModel.profile.systemVersion)
             LabeledContent("Build", value: viewModel.profile.buildVersion)
-            Label(
-                viewModel.profile.isAuthorizedTarget
-                    ? "iPhone 16 / iOS 27 DB3 target matched"
-                    : "Target mismatch — mutations blocked",
-                systemImage: viewModel.profile.isAuthorizedTarget
-                    ? "checkmark.shield.fill"
-                    : "exclamationmark.triangle.fill"
+            Text("No device model or beta build is hard-coded. Capabilities are measured at runtime.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var runtimeCapabilitySection: some View {
+        Section("Observed capabilities") {
+            CapabilityRow(
+                label: "Curated Gestalt reads",
+                enabled: viewModel.runtimeCapabilities.publicGestaltRead
             )
-            .foregroundStyle(viewModel.profile.isAuthorizedTarget ? .green : .orange)
+            CapabilityRow(
+                label: "Sandbox policy API",
+                enabled: viewModel.runtimeCapabilities.sandboxPolicyAPI
+            )
+            CapabilityRow(
+                label: "App-container write",
+                enabled: viewModel.runtimeCapabilities.appContainerWrite
+            )
+            CapabilityRow(
+                label: "Policy permits protected read",
+                enabled: viewModel.runtimeCapabilities.protectedDataPolicyAllowed
+            )
+            CapabilityRow(
+                label: "Policy permits protected write",
+                enabled: viewModel.runtimeCapabilities.protectedWritePolicyAllowed
+            )
+            LabeledContent(
+                "Reachable Mach services",
+                value: String(viewModel.runtimeCapabilities.reachableMachServices)
+            )
         }
     }
 
@@ -64,6 +102,39 @@ struct ContentView: View {
             Text("This build does not claim a sandbox escape, kernel read/write, PPL bypass, or code-signing bypass.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private var experimentSection: some View {
+        Section("Repeatable experiment") {
+            Picker("Experiment", selection: $viewModel.selectedExperiment) {
+                ForEach(ResearchExperiment.allCases) { experiment in
+                    Text(experiment.title).tag(experiment)
+                }
+            }
+            Text(viewModel.selectedExperiment.detail)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Button {
+                viewModel.runSelectedExperiment()
+            } label: {
+                if viewModel.isExperimentRunning {
+                    ProgressView()
+                } else {
+                    Label("Run experiment", systemImage: "play.fill")
+                }
+            }
+            .disabled(viewModel.isExperimentRunning)
+
+            ForEach(viewModel.experimentRecords.prefix(3)) { record in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(record.experiment.title)
+                        .font(.caption.weight(.semibold))
+                    Text(record.summary)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
     }
 
@@ -196,13 +267,73 @@ struct ContentView: View {
                 showCanaryConfirmation = true
             }
             .disabled(
-                !viewModel.profile.isAuthorizedTarget ||
                 !viewModel.isWriteTestingArmed
             )
         } header: {
             Text("Controlled write validation")
         } footer: {
             Text("The stock sandbox should deny this. A successful create-and-delete proves only filesystem access to the selected directory, not a jailbreak.")
+        }
+    }
+
+    private var snapshotSection: some View {
+        Section("Snapshot comparison") {
+            Button {
+                viewModel.saveSnapshot()
+            } label: {
+                Label("Save and compare snapshot", systemImage: "arrow.triangle.2.circlepath")
+            }
+
+            if let url = viewModel.snapshotURL {
+                ShareLink(item: url) {
+                    Label("Export latest snapshot", systemImage: "square.and.arrow.up")
+                }
+            }
+
+            if viewModel.snapshotDifferences.isEmpty {
+                Text("Save a baseline, then save again after an OS update or controlled experiment.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                LabeledContent("Changed fields", value: String(viewModel.snapshotDifferences.count))
+                ForEach(viewModel.snapshotDifferences.prefix(12)) { difference in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(difference.key)
+                            .font(.caption.monospaced())
+                        Text("\(difference.previousValue) → \(difference.currentValue)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    }
+                }
+            }
+        }
+    }
+
+    private var diagnosticSection: some View {
+        Section("Diagnostic correlation") {
+            Button {
+                showDiagnosticImporter = true
+            } label: {
+                Label("Import crash report or diagnostic", systemImage: "doc.badge.plus")
+            }
+            Text("The app hashes the complete selected file and counts security-relevant markers in only its first 4 MB. It does not upload the file.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            ForEach(viewModel.importedDiagnostics.prefix(5)) { diagnostic in
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(diagnostic.fileName)
+                        .font(.caption.weight(.semibold))
+                    Text("\(diagnostic.byteCount) bytes • \(diagnostic.signalCounts.values.reduce(0, +)) markers")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(diagnostic.sha256)
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
         }
     }
 
@@ -235,5 +366,15 @@ private struct CapabilityBadge: View {
             .padding(.vertical, 4)
             .background(enabled ? Color.green.opacity(0.18) : Color.secondary.opacity(0.15))
             .clipShape(Capsule())
+    }
+}
+
+private struct CapabilityRow: View {
+    let label: String
+    let enabled: Bool
+
+    var body: some View {
+        Label(label, systemImage: enabled ? "checkmark.circle.fill" : "xmark.circle")
+            .foregroundStyle(enabled ? .green : .secondary)
     }
 }
