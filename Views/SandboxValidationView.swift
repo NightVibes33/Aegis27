@@ -129,6 +129,16 @@ struct SandboxValidationView: View {
                 ]
             ))
         }
+        if let exportURL = viewModel.exportURL {
+            Task {
+                await GitHubRunnerBridge.shared.submitIfConnected(
+                    fileURL: exportURL,
+                    kind: "sandbox-validation",
+                    profile: researchViewModel.profile,
+                    logger: researchViewModel.logger
+                )
+            }
+        }
     }
 
     private func icon(for status: SandboxValidationStatus) -> String {

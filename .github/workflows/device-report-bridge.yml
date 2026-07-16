@@ -1,0 +1,99 @@
+name: Analyze iPhone report bridge
+
+on:
+  repository_dispatch:
+    types: [aegis27-device-report]
+
+permissions:
+  contents: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ASSET_ID: ${{ github.event.client_payload.asset_id }}
+      RELEASE_ID: ${{ github.event.client_payload.release_id }}
+      EXPECTED_SHA256: ${{ github.event.client_payload.sha256 }}
+      REPORT_KIND: ${{ github.event.client_payload.kind }}
+      TARGET_HARDWARE: ${{ github.event.client_payload.hardware }}
+      TARGET_BUILD: ${{ github.event.client_payload.build }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Check out analyzer
+        uses: actions/checkout@v4
+
+      - name: Validate dispatch metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$ASSET_ID" =~ ^[0-9]+$ ]]
+          [[ "$RELEASE_ID" =~ ^[0-9]+$ ]]
+          [[ "$EXPECTED_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]
+          [[ "$REPORT_KIND" =~ ^[a-z0-9_-]{1,48}$ ]]
+          [[ "$TARGET_HARDWARE" =~ ^[A-Za-z0-9]+,[0-9]+$ ]]
+          [[ "$TARGET_BUILD" =~ ^[A-Za-z0-9]+$ ]]
+
+      - name: Download unpublished source asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/octet-stream" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/assets/$ASSET_ID" \
+            --output device-report.json
+
+      - name: Verify and analyze report
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/analyze_device_report.py device-report.json \
+            --output "analysis-$ASSET_ID.json" \
+            --expected-sha256 "$EXPECTED_SHA256" \
+            --asset-id "$ASSET_ID" \
+            --kind "$REPORT_KIND" \
+            --hardware "$TARGET_HARDWARE" \
+            --build "$TARGET_BUILD"
+          python3 -m json.tool "analysis-$ASSET_ID.json" >/dev/null
+
+      - name: Return compact analysis to unpublished inbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            --data-binary "@analysis-$ASSET_ID.json" \
+            "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?name=analysis-$ASSET_ID.json" \
+            >/dev/null
+
+      - name: Publish compact job summary
+        shell: bash
+        run: |
+          {
+            echo '# Aegis27 automatic device-report analysis'
+            echo
+            echo "- Asset ID: $ASSET_ID"
+            echo "- Kind: $REPORT_KIND"
+            echo "- Target: $TARGET_HARDWARE / $TARGET_BUILD"
+            echo "- SHA-256 verified: yes"
+            echo '- Compact analysis returned to the unpublished device inbox.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Delete processed source asset
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            -X DELETE \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/assets/$ASSET_ID"

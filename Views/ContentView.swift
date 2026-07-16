@@ -34,6 +34,7 @@ struct ContentView: View {
                 targetSection
                 runtimeCapabilitySection
                 primitiveSection
+                runnerBridgeSection
                 attackSurfaceSection
                 experimentSection
                 gestaltSection
@@ -151,6 +152,19 @@ struct ContentView: View {
                 Label("Probe reachable service boundaries", systemImage: "scope")
             }
             Text("Moves beyond filesystem crawling: firmware-derived typed XPC schemas, response fingerprints, controlled parser boundaries, IOKit open-only inventory, crash correlation, repeatability checks, and automatic protected-access validation.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var runnerBridgeSection: some View {
+        Section("Automatic runner") {
+            NavigationLink {
+                RunnerBridgeView()
+            } label: {
+                Label("Connect iPhone to GitHub runner", systemImage: "arrow.triangle.2.circlepath.icloud")
+            }
+            Text("One-time connection enables automatic report upload, free public-runner analysis, and result download without transferring files by hand.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }

@@ -31,7 +31,10 @@ struct AttackSurfaceView: View {
         .alert("Run bounded research suite?", isPresented: $showConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Run") {
-                viewModel.run(logger: researchViewModel.logger)
+                viewModel.run(
+                    logger: researchViewModel.logger,
+                    profile: researchViewModel.profile
+                )
             }
         } message: {
             Text("Each XPC request is repeated three times. Parser inputs are tiny and controlled. IOKit probes only match, open type 0, and immediately close; no external methods are called.")

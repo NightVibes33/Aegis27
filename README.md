@@ -168,6 +168,30 @@ The companion intentionally avoids firmware redistribution, active fuzzing,
 destructive operation values, entitlement values, personal-data paths, and
 exploit payload generation.
 
+## Automatic iPhone-to-runner bridge
+
+Version 0.12 removes manual report transfer after a one-time connection. Open
+**Research → Connect iPhone to GitHub runner** and enter a fine-grained token
+restricted to this repository with `Contents: Read and write`. The token is
+stored as a this-device-only Keychain item; it is never embedded in the IPA or
+written to research logs.
+
+After each deep scan, protected-access validation, or attack-surface run, the
+app automatically:
+
+1. hashes and uploads the generated report to an unpublished draft release;
+2. sends a `repository_dispatch` event containing only validated identifiers;
+3. waits while the standard runner in this public repository verifies the
+   hash and produces a content-minimizing analysis;
+4. downloads `runner-analysis-latest.json`; and
+5. deletes the returned analysis asset while the runner deletes the processed
+   source asset.
+
+The runner never receives the Keychain token. The bridge uses the public
+repository's standard `ubuntu-latest` runner, so it does not require a private
+repository or private-runner minutes. Installing/signing the IPA and the
+one-time GitHub connection cannot be automated by an unsigned application.
+
 ## Safety behavior
 
 - The target model, OS version, and build are recorded, not hard-coded.

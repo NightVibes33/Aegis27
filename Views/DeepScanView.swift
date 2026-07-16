@@ -196,6 +196,16 @@ struct DeepScanView: View {
                     "nodeLimitReached": String(report.nodeLimitReached)
                 ]
             ))
+            if let exportURL = viewModel.exportURL {
+                Task {
+                    await GitHubRunnerBridge.shared.submitIfConnected(
+                        fileURL: exportURL,
+                        kind: "deep-scan",
+                        profile: researchViewModel.profile,
+                        logger: researchViewModel.logger
+                    )
+                }
+            }
         }
     }
 }

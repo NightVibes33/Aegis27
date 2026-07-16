@@ -50,3 +50,12 @@ inside the dyld shared cache. Consequently:
 The workflow extracts a maximum number of launchd-referenced programs and the
 analyzer enforces per-file and aggregate byte budgets. Its uploaded artifact
 contains reports and checksums only—never the IPSW or extracted executables.
+
+## Device-report return channel
+
+The separate `device-report-bridge.yml` workflow is triggered automatically by
+the installed app after its one-time Keychain connection. Reports are staged
+as assets on an unpublished draft release, analyzed on `ubuntu-latest`, and
+replaced with a compact result that the app downloads. Source assets are
+deleted after successful processing; result assets are deleted after the app
+has saved them locally. No private repository is required.

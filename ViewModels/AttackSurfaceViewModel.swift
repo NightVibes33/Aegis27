@@ -55,7 +55,7 @@ final class AttackSurfaceViewModel: ObservableObject {
         }
     }
 
-    func run(logger: AuditLogger) {
+    func run(logger: AuditLogger, profile: DeviceProfile) {
         guard !isRunning else { return }
         isRunning = true
         report = nil
@@ -70,6 +70,14 @@ final class AttackSurfaceViewModel: ObservableObject {
             report = newReport
             exportURL = save(report: newReport)
             log(report: newReport, to: logger)
+            if let exportURL {
+                await GitHubRunnerBridge.shared.submitIfConnected(
+                    fileURL: exportURL,
+                    kind: "attack-surface",
+                    profile: profile,
+                    logger: logger
+                )
+            }
             isRunning = false
         }
     }

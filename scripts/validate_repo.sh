@@ -10,6 +10,8 @@ required=(
   .github/workflows/build-unsigned-ipa.yml
   .github/workflows/cloud-firmware-lab.yml
   scripts/cloud_firmware_lab.py
+  scripts/analyze_device_report.py
+  .github/workflows/device-report-bridge.yml
 )
 
 for path in "${required[@]}"; do
@@ -17,6 +19,7 @@ for path in "${required[@]}"; do
 done
 
 python3 -m unittest tests/test_cloud_firmware_lab.py
+python3 -m unittest tests/test_analyze_device_report.py
 
 if grep -R --line-number -E 'platform-application|com\.apple\.private|task_for_pid-allow|get-task-allow' Resources; then
   echo "Private or unsafe entitlement found" >&2
