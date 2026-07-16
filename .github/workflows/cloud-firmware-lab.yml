@@ -1,0 +1,132 @@
+name: Build cloud firmware probe catalog
+
+on:
+  workflow_dispatch:
+    inputs:
+      device:
+        description: Apple hardware identifier
+        required: true
+        default: iPhone17,3
+        type: string
+      build:
+        description: Exact iOS build identifier
+        required: true
+        default: 24A5380h
+        type: string
+      maximum_programs:
+        description: Maximum launchd Program binaries to extract
+        required: true
+        default: "768"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: macos-26
+    timeout-minutes: 120
+    env:
+      TARGET_DEVICE: ${{ inputs.device }}
+      TARGET_BUILD: ${{ inputs.build }}
+      MAXIMUM_PROGRAMS: ${{ inputs.maximum_programs }}
+
+    steps:
+      - name: Check out Aegis27
+        uses: actions/checkout@v4
+
+      - name: Validate workflow inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$TARGET_DEVICE" =~ ^[A-Za-z0-9]+,[0-9]+$ ]]
+          [[ "$TARGET_BUILD" =~ ^[A-Za-z0-9]+$ ]]
+          [[ "$MAXIMUM_PROGRAMS" =~ ^[0-9]+$ ]]
+          test "$MAXIMUM_PROGRAMS" -ge 1
+          test "$MAXIMUM_PROGRAMS" -le 2048
+
+      - name: Install firmware tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew tap blacktop/tap
+          brew trust blacktop/tap
+          brew install --formula blacktop/tap/ipsw
+          ipsw version | tee ipsw-version.txt
+
+      - name: Resolve and download the exact IPSW
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p firmware/download firmware/extracted firmware/report
+          ipsw --no-color download appledb \
+            --os iOS \
+            --type ipsw \
+            --device "$TARGET_DEVICE" \
+            --build "$TARGET_BUILD" \
+            --output firmware/download \
+            --confirm
+          IPSW_PATH="$(find firmware/download -type f -name '*.ipsw' -print -quit)"
+          test -n "$IPSW_PATH"
+          echo "IPSW_PATH=$IPSW_PATH" >> "$GITHUB_ENV"
+          shasum -a 256 "$IPSW_PATH" > firmware/ipsw.sha256
+          ipsw --no-color info --json "$IPSW_PATH" > firmware/ipsw-info.json
+          grep -q "$TARGET_BUILD" firmware/ipsw-info.json
+
+      - name: Extract launchd and sandbox metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          ipsw --no-color extract --files \
+            --pattern '.*(Library/LaunchDaemons|System/Library/LaunchDaemons)/.*\.plist$' \
+            --output firmware/extracted \
+            "$IPSW_PATH"
+          ipsw --no-color extract --files \
+            --pattern '.*System/Library/Sandbox/Profiles/.*' \
+            --output firmware/extracted \
+            "$IPSW_PATH" || true
+
+      - name: Plan bounded service-binary extraction
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/cloud_firmware_lab.py plan firmware/extracted \
+            --maximum-programs "$MAXIMUM_PROGRAMS" \
+            --regex-output firmware/program-regex.txt \
+            --paths-output firmware/program-paths.txt
+          test -s firmware/program-regex.txt
+          test -s firmware/program-paths.txt
+
+      - name: Extract referenced service binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -c 'import os,pathlib,subprocess; pattern=pathlib.Path("firmware/program-regex.txt").read_text().strip(); subprocess.run(["ipsw","--no-color","extract","--files","--pattern",pattern,"--output","firmware/extracted",os.environ["IPSW_PATH"]],check=True)'
+
+      - name: Build evidence report and inert catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/cloud_firmware_lab.py analyze firmware/extracted \
+            --device "$TARGET_DEVICE" \
+            --build "$TARGET_BUILD" \
+            --output-dir firmware/report
+          cp firmware/ipsw-info.json firmware/report/
+          cp firmware/ipsw.sha256 firmware/report/
+          cp firmware/program-paths.txt firmware/report/
+          cp ipsw-version.txt firmware/report/
+          python3 -m json.tool firmware/report/aegis27-probe-catalog.json >/dev/null
+          python3 -m json.tool firmware/report/firmware-lab-report.json >/dev/null
+          shasum -a 256 firmware/report/*.json > firmware/report/JSON-SHA256SUMS
+
+      - name: Publish summary
+        shell: bash
+        run: cat firmware/report/SUMMARY.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload catalog and evidence only
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aegis27-firmware-lab-${{ inputs.device }}-${{ inputs.build }}
+          path: firmware/report/
+          if-no-files-found: error
+          retention-days: 14

@@ -132,6 +132,42 @@ daemon crash, parser timeout, or open IOKit user client remains a candidate.
 Only an actual protected read or foreign-container listing is labeled
 controlled security impact.
 
+## Cloud firmware lab (no Mac required)
+
+The manual **Build cloud firmware probe catalog** workflow runs the offline
+firmware-analysis side on a GitHub-hosted macOS runner. Enter the exact hardware
+identifier and build from Aegis27's target card (for example `iPhone17,3` and
+`24A5380h`). The workflow then:
+
+1. resolves and downloads that exact IPSW;
+2. extracts launchd service declarations and sandbox-profile metadata;
+3. extracts only the bounded set of executables referenced by launchd;
+4. maps declared Mach services to their program binaries;
+5. records hashes, entitlement **keys**, XPC API evidence, candidate dictionary
+   keys, Objective-C selectors, Swift symbols, parser types, and IOKit classes;
+6. emits `aegis27-probe-catalog.json` plus a separate evidence report; and
+7. uploads only the small reports—not Apple firmware or extracted binaries.
+
+Download the workflow artifact, open Aegis27's **Attack Surface** mode, import
+`aegis27-probe-catalog.json`, and run the bounded suite. The generated typed
+requests always contain Aegis27's fixed inert marker. Static strings indicate
+candidate protocol fields, not proven semantics or vulnerabilities; runtime
+reproduction and the protected-access validator remain decisive.
+
+The analyzer can also run against an already extracted firmware tree on Linux,
+Windows, or macOS:
+
+```sh
+python3 scripts/cloud_firmware_lab.py analyze /path/to/extracted/files \
+  --device iPhone17,3 \
+  --build 24A5380h \
+  --output-dir firmware-lab-report
+```
+
+The companion intentionally avoids firmware redistribution, active fuzzing,
+destructive operation values, entitlement values, personal-data paths, and
+exploit payload generation.
+
 ## Safety behavior
 
 - The target model, OS version, and build are recorded, not hard-coded.

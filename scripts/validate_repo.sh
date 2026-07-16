@@ -8,11 +8,15 @@ required=(
   App/Aegis27App.swift
   Views/ContentView.swift
   .github/workflows/build-unsigned-ipa.yml
+  .github/workflows/cloud-firmware-lab.yml
+  scripts/cloud_firmware_lab.py
 )
 
 for path in "${required[@]}"; do
   test -f "$path" || { echo "Missing $path" >&2; exit 1; }
 done
+
+python3 -m unittest tests/test_cloud_firmware_lab.py
 
 if grep -R --line-number -E 'platform-application|com\.apple\.private|task_for_pid-allow|get-task-allow' Resources; then
   echo "Private or unsafe entitlement found" >&2
