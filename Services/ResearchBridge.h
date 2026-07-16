@@ -11,5 +11,10 @@ int32_t aegis_bootstrap_probe_service(
     uint32_t *port_type,
     uint32_t *send_right_refs
 );
+int32_t aegis_xpc_empty_dictionary_probe(
+    const char *name,
+    uint32_t timeout_milliseconds,
+    uint64_t *elapsed_nanoseconds
+);
 
 #endif

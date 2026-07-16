@@ -1,10 +1,12 @@
 #include "ResearchBridge.h"
 
 #include <dlfcn.h>
+#include <dispatch/dispatch.h>
 #include <limits.h>
 #include <mach/mach.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <xpc/xpc.h>
 
 typedef int (*sandbox_check_function)(pid_t, const char *, int, ...);
 typedef kern_return_t (*bootstrap_lookup_function)(
@@ -144,4 +146,109 @@ int32_t aegis_bootstrap_probe_service(
 
     mach_port_deallocate(mach_task_self(), bootstrap);
     return (int32_t)result;
+}
+
+// Return values are intentionally small and stable for the Swift model:
+// 0 dictionary reply, 1 XPC error reply, 2 other reply, 3 timeout,
+// 4 runtime API unavailable, 5 invalid argument/connection creation failure.
+int32_t aegis_xpc_empty_dictionary_probe(
+    const char *name,
+    uint32_t timeout_milliseconds,
+    uint64_t *elapsed_nanoseconds
+) {
+    if (name == NULL || elapsed_nanoseconds == NULL || timeout_milliseconds == 0) {
+        return 5;
+    }
+
+    typedef xpc_connection_t (*create_function)(
+        const char *, dispatch_queue_t, uint64_t
+    );
+    typedef void (*set_handler_function)(
+        xpc_connection_t, xpc_handler_t
+    );
+    typedef void (*connection_action_function)(xpc_connection_t);
+    typedef xpc_object_t (*dictionary_create_function)(
+        const char * const *, const xpc_object_t *, size_t
+    );
+    typedef void (*send_reply_function)(
+        xpc_connection_t, xpc_object_t, dispatch_queue_t, xpc_handler_t
+    );
+    typedef xpc_type_t (*get_type_function)(xpc_object_t);
+    typedef void (*release_function)(xpc_object_t);
+
+    create_function create_connection =
+        (create_function)dlsym(RTLD_DEFAULT, "xpc_connection_create_mach_service");
+    set_handler_function set_handler =
+        (set_handler_function)dlsym(RTLD_DEFAULT, "xpc_connection_set_event_handler");
+    connection_action_function resume_connection =
+        (connection_action_function)dlsym(RTLD_DEFAULT, "xpc_connection_resume");
+    connection_action_function cancel_connection =
+        (connection_action_function)dlsym(RTLD_DEFAULT, "xpc_connection_cancel");
+    dictionary_create_function create_dictionary =
+        (dictionary_create_function)dlsym(RTLD_DEFAULT, "xpc_dictionary_create");
+    send_reply_function send_with_reply =
+        (send_reply_function)dlsym(RTLD_DEFAULT, "xpc_connection_send_message_with_reply");
+    get_type_function get_type =
+        (get_type_function)dlsym(RTLD_DEFAULT, "xpc_get_type");
+    release_function release_object =
+        (release_function)dlsym(RTLD_DEFAULT, "xpc_release");
+
+    if (create_connection == NULL || set_handler == NULL ||
+        resume_connection == NULL || cancel_connection == NULL ||
+        create_dictionary == NULL || send_with_reply == NULL ||
+        get_type == NULL) {
+        return 4;
+    }
+
+    dispatch_queue_t queue = dispatch_get_global_queue(QOS_CLASS_UTILITY, 0);
+    xpc_connection_t connection = create_connection(name, queue, 0);
+    if (connection == NULL) {
+        return 5;
+    }
+
+    set_handler(connection, ^(xpc_object_t event) {
+        (void)event;
+    });
+    resume_connection(connection);
+
+    xpc_object_t message = create_dictionary(NULL, NULL, 0);
+    if (message == NULL) {
+        cancel_connection(connection);
+        if (release_object != NULL) {
+            release_object(connection);
+        }
+        return 5;
+    }
+
+    dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+    __block int32_t disposition = 2;
+    uint64_t started = dispatch_time(DISPATCH_TIME_NOW, 0);
+
+    send_with_reply(connection, message, queue, ^(xpc_object_t reply) {
+        xpc_type_t type = reply == NULL ? NULL : get_type(reply);
+        if (type == XPC_TYPE_DICTIONARY) {
+            disposition = 0;
+        } else if (type == XPC_TYPE_ERROR) {
+            disposition = 1;
+        } else {
+            disposition = 2;
+        }
+        dispatch_semaphore_signal(semaphore);
+    });
+
+    dispatch_time_t deadline = dispatch_time(
+        DISPATCH_TIME_NOW,
+        (int64_t)timeout_milliseconds * (int64_t)NSEC_PER_MSEC
+    );
+    if (dispatch_semaphore_wait(semaphore, deadline) != 0) {
+        disposition = 3;
+    }
+
+    *elapsed_nanoseconds = dispatch_time(DISPATCH_TIME_NOW, 0) - started;
+    cancel_connection(connection);
+    if (release_object != NULL) {
+        release_object(message);
+        release_object(connection);
+    }
+    return disposition;
 }

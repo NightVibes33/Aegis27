@@ -81,6 +81,16 @@ success, protected metadata visibility, and protected-data access so a metadata
 permission denial, unavailable providers, and skipped checks are classified
 independently.
 
+Version 0.9 adds a dedicated **Attack Surface** mode. It sends exactly one
+empty XPC dictionary to each catalog service that already resolves from the
+stock app sandbox, applies a 750 ms response deadline, classifies only the
+reply type, and checks whether service reachability changed. It then always
+runs the decisive protected-file and foreign-container validation. Empty
+dictionary rejection is expected and is not reported as a vulnerability;
+service-specific commands, attacker-selected paths, and destructive requests
+are outside this mode. A compact JSON report avoids another filesystem-sized
+export.
+
 ## Safety behavior
 
 - The target model, OS version, and build are recorded, not hard-coded.

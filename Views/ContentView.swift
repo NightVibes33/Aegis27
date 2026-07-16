@@ -34,6 +34,7 @@ struct ContentView: View {
                 targetSection
                 runtimeCapabilitySection
                 primitiveSection
+                attackSurfaceSection
                 experimentSection
                 gestaltSection
                 filesystemSection
@@ -137,6 +138,19 @@ struct ContentView: View {
         Section("Privileged primitive") {
             LabeledContent("Status", value: viewModel.primitiveSummary)
             Text("This build does not claim a sandbox escape, kernel read/write, PPL bypass, or code-signing bypass.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var attackSurfaceSection: some View {
+        Section("Attack-surface mode") {
+            NavigationLink {
+                AttackSurfaceView()
+            } label: {
+                Label("Probe reachable service boundaries", systemImage: "scope")
+            }
+            Text("Moves beyond filesystem crawling: bounded XPC requests, response classification, reachability comparison, and automatic protected-access validation.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
