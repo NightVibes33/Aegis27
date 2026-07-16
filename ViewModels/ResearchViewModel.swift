@@ -89,6 +89,7 @@ final class ResearchViewModel: ObservableObject {
         }
 
         for result in machServiceResults {
+            let candidate = ServiceResearchCatalog.candidate(for: result.service)
             logger.record(ResearchEvent(
                 severity: result.reachable ? .warning : .info,
                 subsystem: "mach-service",
@@ -98,7 +99,9 @@ final class ResearchViewModel: ObservableObject {
                 details: [
                     "service": result.service,
                     "rawResult": String(result.rawResult),
-                    "reachable": String(result.reachable)
+                    "reachable": String(result.reachable),
+                    "candidateSubsystem": candidate?.subsystem ?? "unclassified",
+                    "candidateConfidence": candidate?.confidence.rawValue ?? "unclassified"
                 ]
             ))
         }

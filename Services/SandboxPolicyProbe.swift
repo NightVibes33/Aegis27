@@ -18,19 +18,10 @@ enum SandboxPolicyProbe {
         "/var/mobile/Library/Caches/com.apple.MobileGestalt.plist"
     ]
 
-    // Candidate names are policy probes, not claims that every service exists
-    // on this build. An allowed mach-lookup rule is only a lead for later
-    // interface inventory; it is not itself a vulnerability.
-    static let machServices = [
-        "com.apple.mobilegestalt.xpc",
-        "com.apple.cfprefsd.daemon",
-        "com.apple.cfprefsd.agent",
-        "com.apple.bookassetd",
-        "com.apple.itunesstored",
-        "com.apple.mobileassetd",
-        "com.apple.mobile.file_relay",
-        "com.apple.backupd"
-    ]
+    // Every entry is either observed on the target, named by the public
+    // firmware diff, or explicitly marked as a bounded name candidate.
+    // Lookup never sends a protocol message to the returned port.
+    static let machServices = ServiceResearchCatalog.serviceNames
 
     static func run() -> [SandboxPolicyResult] {
         var results: [SandboxPolicyResult] = []

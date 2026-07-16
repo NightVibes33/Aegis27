@@ -6,23 +6,43 @@ enum ProviderCapabilityValidator {
     ) -> ProviderCapabilityReport {
         let home = NSHomeDirectory()
         let protectedDirectory = "/var/mobile/Library/Preferences"
-        let protectedFile = "/var/mobile/Library/Preferences/com.apple.MobileGestalt.plist"
-
         let homeMetadata = provider.metadata(at: home)
         let homeListing = provider.listDirectory(at: home)
         let protectedMetadata = provider.metadata(at: protectedDirectory)
         let protectedListing = provider.listDirectory(at: protectedDirectory)
-        let protectedRead = provider.readPreview(at: protectedFile, limit: 4_096)
+
+        let protectedReadCheck: ProviderAccessCheck
+        if protectedListing.succeeded,
+           let file = protectedListing.entries.first(where: {
+               !$0.isDirectory && !$0.isSymbolicLink
+           }) {
+            let protectedRead = provider.readPreview(at: file.path, limit: 4_096)
+            protectedReadCheck = check(
+                "Protected file preview",
+                protectedRead.path,
+                "read",
+                protectedRead.outcome,
+                protectedRead.errorDescription
+            )
+        } else {
+            protectedReadCheck = ProviderAccessCheck(
+                label: "Protected file preview",
+                path: protectedDirectory,
+                operation: "read",
+                outcome: .notTested,
+                detail: "Not run because the protected directory could not be listed."
+            )
+        }
 
         return ProviderCapabilityReport(
             provider: provider.kind,
             timestamp: Date(),
             checks: [
-                check("App container metadata", homeMetadata.path, "stat", homeMetadata.succeeded, homeMetadata.errorDescription),
-                check("App container listing", homeListing.path, "list", homeListing.succeeded, homeListing.errorDescription),
-                check("Protected metadata", protectedMetadata.path, "stat", protectedMetadata.succeeded, protectedMetadata.errorDescription),
-                check("Protected listing", protectedListing.path, "list", protectedListing.succeeded, protectedListing.errorDescription),
-                check("Protected file preview", protectedRead.path, "read", protectedRead.succeeded, protectedRead.errorDescription)
+                check("App container metadata", homeMetadata.path, "stat", homeMetadata.outcome, homeMetadata.errorDescription),
+                check("App container listing", homeListing.path, "list", homeListing.outcome, homeListing.errorDescription),
+                check("Protected metadata", protectedMetadata.path, "stat", protectedMetadata.outcome, protectedMetadata.errorDescription),
+                check("Protected listing", protectedListing.path, "list", protectedListing.outcome, protectedListing.errorDescription),
+                protectedReadCheck
             ]
         )
     }
@@ -31,15 +51,15 @@ enum ProviderCapabilityValidator {
         _ label: String,
         _ path: String,
         _ operation: String,
-        _ succeeded: Bool,
+        _ outcome: FileAccessOutcome,
         _ error: String?
     ) -> ProviderAccessCheck {
         ProviderAccessCheck(
             label: label,
             path: path,
             operation: operation,
-            succeeded: succeeded,
-            detail: succeeded ? "Operation completed" : (error ?? "Operation failed")
+            outcome: outcome,
+            detail: outcome == .success ? "Operation completed" : (error ?? outcome.title)
         )
     }
 }

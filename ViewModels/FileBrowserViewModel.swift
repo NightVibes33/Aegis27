@@ -9,6 +9,7 @@ final class FileBrowserViewModel: ObservableObject {
     @Published var includeSensitiveTargets = false
     @Published private(set) var entries: [FileEntry] = []
     @Published private(set) var listingError: String?
+    @Published private(set) var listingOutcome = FileAccessOutcome.notTested
     @Published private(set) var preview: FilePreviewResult?
     @Published private(set) var capabilityReport: ProviderCapabilityReport?
     @Published private(set) var targetObservations: [FileTargetObservation] = []
@@ -58,6 +59,7 @@ final class FileBrowserViewModel: ObservableObject {
                 truncated: false,
                 text: nil,
                 hex: "",
+                outcome: .notTested,
                 errorDescription: "Symbolic links are not followed by the browser."
             )
         } else if entry.isDirectory {
@@ -71,6 +73,7 @@ final class FileBrowserViewModel: ObservableObject {
         let result = provider.listDirectory(at: currentPath)
         entries = result.entries
         listingError = result.errorDescription
+        listingOutcome = result.outcome
     }
 
     func validateProvider() {

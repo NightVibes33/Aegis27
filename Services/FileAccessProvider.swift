@@ -32,12 +32,14 @@ struct StockFileAccessProvider: FileAccessProvider {
             return FileMetadataResult(
                 path: normalized,
                 entry: makeEntry(path: normalized, attributes: attributes),
+                outcome: .success,
                 errorDescription: nil
             )
         } catch {
             return FileMetadataResult(
                 path: normalized,
                 entry: nil,
+                outcome: classify(error),
                 errorDescription: String(describing: error)
             )
         }
@@ -61,12 +63,14 @@ struct StockFileAccessProvider: FileAccessProvider {
             return DirectoryListingResult(
                 path: normalized,
                 entries: entries,
+                outcome: .success,
                 errorDescription: nil
             )
         } catch {
             return DirectoryListingResult(
                 path: normalized,
                 entries: [],
+                outcome: classify(error),
                 errorDescription: String(describing: error)
             )
         }
@@ -88,6 +92,7 @@ struct StockFileAccessProvider: FileAccessProvider {
                 truncated: expectedSize > data.count,
                 text: text,
                 hex: hexPreview(data),
+                outcome: .success,
                 errorDescription: nil
             )
         } catch {
@@ -97,6 +102,7 @@ struct StockFileAccessProvider: FileAccessProvider {
                 truncated: false,
                 text: nil,
                 hex: "",
+                outcome: classify(error),
                 errorDescription: String(describing: error)
             )
         }
@@ -108,6 +114,33 @@ struct StockFileAccessProvider: FileAccessProvider {
 
     private func normalizedPath(_ path: String) -> String {
         NSString(string: path).standardizingPath
+    }
+
+    private func classify(_ error: Error) -> FileAccessOutcome {
+        let nsError = error as NSError
+        let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError
+        let codes = [nsError, underlying].compactMap { value -> Int? in
+            guard let value else { return nil }
+            return value.code
+        }
+
+        if nsError.domain == NSCocoaErrorDomain {
+            if nsError.code == NSFileReadNoPermissionError ||
+                nsError.code == NSFileWriteNoPermissionError {
+                return .permissionDenied
+            }
+            if nsError.code == NSFileNoSuchFileError {
+                return .missing
+            }
+        }
+
+        if codes.contains(Int(EACCES)) || codes.contains(Int(EPERM)) {
+            return .permissionDenied
+        }
+        if codes.contains(Int(ENOENT)) {
+            return .missing
+        }
+        return .failed
     }
 
     private func makeEntry(
@@ -143,11 +176,21 @@ struct UnavailableEscapedFileAccessProvider: FileAccessProvider {
     let isAvailable = false
 
     func metadata(at path: String) -> FileMetadataResult {
-        FileMetadataResult(path: path, entry: nil, errorDescription: availabilitySummary)
+        FileMetadataResult(
+            path: path,
+            entry: nil,
+            outcome: .providerUnavailable,
+            errorDescription: availabilitySummary
+        )
     }
 
     func listDirectory(at path: String) -> DirectoryListingResult {
-        DirectoryListingResult(path: path, entries: [], errorDescription: availabilitySummary)
+        DirectoryListingResult(
+            path: path,
+            entries: [],
+            outcome: .providerUnavailable,
+            errorDescription: availabilitySummary
+        )
     }
 
     func readPreview(at path: String, limit: Int) -> FilePreviewResult {
@@ -157,6 +200,7 @@ struct UnavailableEscapedFileAccessProvider: FileAccessProvider {
             truncated: false,
             text: nil,
             hex: "",
+            outcome: .providerUnavailable,
             errorDescription: availabilitySummary
         )
     }

@@ -57,6 +57,15 @@ refresh, copy-path context menus, and a dedicated preview sheet. Provider
 validation and research targets live in a separate inspector instead of
 interrupting normal browsing.
 
+Version 0.8 adds an evidence-labeled beta-3 service matrix derived from the
+public `24A5370h` to `24A5380h` firmware diff. It expands read-only policy and
+bootstrap lookup coverage around MobileAsset, Books, MobileBackup, CacheDelete,
+FileProvider, container management, and AFC. It also separates app-container
+success, protected metadata visibility, and protected-data access so a metadata
+`stat` can no longer inflate the protected-access result. Missing paths,
+permission denial, unavailable providers, and skipped checks are classified
+independently.
+
 ## Safety behavior
 
 - The target model, OS version, and build are recorded, not hard-coded.

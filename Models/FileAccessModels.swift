@@ -26,20 +26,42 @@ struct FileEntry: Identifiable, Codable {
     let writable: Bool
 }
 
+enum FileAccessOutcome: String, Codable {
+    case success
+    case permissionDenied
+    case missing
+    case providerUnavailable
+    case notTested
+    case failed
+
+    var title: String {
+        switch self {
+        case .success: return "Succeeded"
+        case .permissionDenied: return "Permission denied"
+        case .missing: return "Missing"
+        case .providerUnavailable: return "Provider unavailable"
+        case .notTested: return "Not tested"
+        case .failed: return "Failed"
+        }
+    }
+}
+
 struct FileMetadataResult: Codable {
     let path: String
     let entry: FileEntry?
+    let outcome: FileAccessOutcome
     let errorDescription: String?
 
-    var succeeded: Bool { entry != nil }
+    var succeeded: Bool { outcome == .success }
 }
 
 struct DirectoryListingResult: Codable {
     let path: String
     let entries: [FileEntry]
+    let outcome: FileAccessOutcome
     let errorDescription: String?
 
-    var succeeded: Bool { errorDescription == nil }
+    var succeeded: Bool { outcome == .success }
 }
 
 struct FilePreviewResult: Codable {
@@ -48,9 +70,10 @@ struct FilePreviewResult: Codable {
     let truncated: Bool
     let text: String?
     let hex: String
+    let outcome: FileAccessOutcome
     let errorDescription: String?
 
-    var succeeded: Bool { errorDescription == nil }
+    var succeeded: Bool { outcome == .success }
 }
 
 struct ProviderAccessCheck: Identifiable, Codable {
@@ -59,20 +82,22 @@ struct ProviderAccessCheck: Identifiable, Codable {
     let path: String
     let operation: String
     let succeeded: Bool
+    let outcome: FileAccessOutcome
     let detail: String
 
     init(
         label: String,
         path: String,
         operation: String,
-        succeeded: Bool,
+        outcome: FileAccessOutcome,
         detail: String
     ) {
         self.id = UUID()
         self.label = label
         self.path = path
         self.operation = operation
-        self.succeeded = succeeded
+        self.succeeded = outcome == .success
+        self.outcome = outcome
         self.detail = detail
     }
 }
@@ -83,6 +108,18 @@ struct ProviderCapabilityReport: Codable {
     let checks: [ProviderAccessCheck]
 
     var passedCount: Int { checks.filter(\.succeeded).count }
+    var containerPassedCount: Int {
+        checks.filter { $0.label.hasPrefix("App container") && $0.succeeded }.count
+    }
+    var protectedMetadataVisible: Bool {
+        checks.first { $0.label == "Protected metadata" }?.succeeded ?? false
+    }
+    var protectedDataPassedCount: Int {
+        checks.filter {
+            ($0.label == "Protected listing" || $0.label == "Protected file preview") &&
+            $0.succeeded
+        }.count
+    }
 }
 
 enum ResearchTargetCategory: String, Codable {

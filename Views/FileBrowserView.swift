@@ -367,19 +367,34 @@ struct FileBrowserView: View {
                 validateProvider()
             }
             if let report = viewModel.capabilityReport {
-                LabeledContent("Passed", value: "\(report.passedCount) of \(report.checks.count)")
+                LabeledContent(
+                    "App container",
+                    value: "\(report.containerPassedCount) of 2"
+                )
+                LabeledContent(
+                    "Protected metadata",
+                    value: report.protectedMetadataVisible ? "Visible" : "Unavailable"
+                )
+                LabeledContent(
+                    "Protected data",
+                    value: "\(report.protectedDataPassedCount) of 2"
+                )
                 ForEach(report.checks) { check in
                     VStack(alignment: .leading, spacing: 3) {
                         Label(
                             check.label,
-                            systemImage: check.succeeded ? "checkmark.circle.fill" : "xmark.circle"
+                            systemImage: check.succeeded
+                                ? "checkmark.circle.fill"
+                                : (check.outcome == .notTested
+                                    ? "minus.circle"
+                                    : "xmark.circle")
                         )
                         .foregroundStyle(check.succeeded ? .green : .secondary)
                         Text("\(check.operation) • \(check.path)")
                             .font(.caption2.monospaced())
                             .foregroundStyle(.secondary)
                         if !check.succeeded {
-                            Text(check.detail)
+                            Text("\(check.outcome.title): \(check.detail)")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(2)
@@ -558,14 +573,13 @@ struct FileBrowserView: View {
         researchViewModel.logger.record(ResearchEvent(
             severity: preview?.succeeded == true ? .success : .info,
             subsystem: "file-preview",
-            message: preview?.succeeded == true
-                ? "Bounded file preview completed"
-                : "Bounded file preview denied",
+            message: "Bounded file preview \((preview?.outcome ?? .notTested).title.lowercased())",
             details: [
                 "provider": viewModel.selectedProvider.rawValue,
                 "path": entry.path,
                 "bytesRead": String(preview?.bytesRead ?? 0),
                 "truncated": String(preview?.truncated ?? false),
+                "outcome": (preview?.outcome ?? .notTested).rawValue,
                 "error": preview?.errorDescription ?? "none"
             ]
         ))
@@ -583,15 +597,14 @@ struct FileBrowserView: View {
 
     private func recordDirectoryResult() {
         researchViewModel.logger.record(ResearchEvent(
-            severity: viewModel.listingError == nil ? .success : .info,
+            severity: viewModel.listingOutcome == .success ? .success : .info,
             subsystem: "file-browser",
-            message: viewModel.listingError == nil
-                ? "Directory listing completed"
-                : "Directory listing denied",
+            message: "Directory listing \(viewModel.listingOutcome.title.lowercased())",
             details: [
                 "provider": viewModel.selectedProvider.rawValue,
                 "path": viewModel.currentPath,
                 "entries": String(viewModel.entries.count),
+                "outcome": viewModel.listingOutcome.rawValue,
                 "error": viewModel.listingError ?? "none"
             ]
         ))
@@ -606,21 +619,23 @@ struct FileBrowserView: View {
             details: [
                 "provider": report.provider.rawValue,
                 "passed": String(report.passedCount),
-                "checks": String(report.checks.count)
+                "checks": String(report.checks.count),
+                "containerPassed": String(report.containerPassedCount),
+                "protectedMetadata": String(report.protectedMetadataVisible),
+                "protectedDataPassed": String(report.protectedDataPassedCount)
             ]
         ))
         for check in report.checks {
             researchViewModel.logger.record(ResearchEvent(
                 severity: check.succeeded ? .success : .info,
                 subsystem: "file-provider-check",
-                message: check.succeeded
-                    ? "Provider operation completed"
-                    : "Provider operation denied",
+                message: "Provider operation \(check.outcome.title.lowercased())",
                 details: [
                     "provider": report.provider.rawValue,
                     "label": check.label,
                     "operation": check.operation,
                     "path": check.path,
+                    "outcome": check.outcome.rawValue,
                     "detail": check.detail
                 ]
             ))

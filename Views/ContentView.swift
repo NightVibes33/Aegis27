@@ -30,6 +30,7 @@ struct ContentView: View {
                 gestaltSection
                 filesystemSection
                 sandboxPolicySection
+                firmwareFocusSection
                 machServiceSection
                 xpcConnectionSection
                 canarySection
@@ -236,6 +237,13 @@ struct ContentView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(result.service)
                             .font(.caption.monospaced())
+                        if let candidate = ServiceResearchCatalog.candidate(
+                            for: result.service
+                        ) {
+                            Text("\(candidate.subsystem) • \(candidate.confidence.rawValue)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                         Text(result.reachable
                             ? "Resolved"
                             : "Lookup error \(result.rawResult)")
@@ -245,6 +253,46 @@ struct ContentView: View {
                 }
             }
         }
+    }
+
+    private var firmwareFocusSection: some View {
+        Section("Beta 3 firmware focus") {
+            Text("Public device-class diff: iPhone18,1, 24A5370h → 24A5380h. Runtime lookup results below are measured on this device.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            ForEach(ServiceResearchCatalog.findings) { finding in
+                DisclosureGroup {
+                    Text(finding.significance)
+                        .font(.caption)
+                    ForEach(finding.services, id: \.self) { service in
+                        HStack {
+                            Image(systemName: serviceResolved(service)
+                                ? "checkmark.circle.fill"
+                                : "circle")
+                                .foregroundStyle(serviceResolved(service)
+                                    ? .orange
+                                    : .secondary)
+                            Text(service)
+                                .font(.caption2.monospaced())
+                        }
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(finding.title)
+                        Text(finding.buildDelta)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private func serviceResolved(_ service: String) -> Bool {
+        viewModel.machServiceResults.first {
+            $0.service == service
+        }?.reachable ?? false
     }
 
     private var xpcConnectionSection: some View {

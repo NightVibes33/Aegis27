@@ -1,0 +1,60 @@
+name: Index iOS 27 beta 3 file-service changes
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/beta3-service-index.yml
+      - scripts/index_beta3_service_diff.sh
+      - Services/ServiceResearchCatalog.swift
+      - docs/BETA3_SERVICE_ANALYSIS.md
+
+permissions:
+  contents: read
+
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out Aegis27
+        uses: actions/checkout@v4
+
+      - name: Fetch the public beta 2 to beta 3 diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --filter=blob:none --sparse \
+            https://github.com/blacktop/ipsw-diffs.git upstream
+          git -C upstream sparse-checkout set \
+            27_0_24A5370h_vs_27_0_24A5380h
+          git -C upstream rev-parse HEAD > upstream-commit.txt
+
+      - name: Build focused evidence index
+        shell: bash
+        run: |
+          set -euo pipefail
+          scripts/index_beta3_service_diff.sh \
+            upstream/27_0_24A5370h_vs_27_0_24A5380h \
+            beta3-service-index
+          cp upstream-commit.txt beta3-service-index/
+
+      - name: Package focused index
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -czf beta3-service-index.tar.gz beta3-service-index
+          sha256sum beta3-service-index.tar.gz \
+            > beta3-service-index.tar.gz.sha256
+
+      - name: Upload focused index
+        uses: actions/upload-artifact@v4
+        with:
+          name: iOS27-beta3-service-index
+          path: |
+            beta3-service-index.tar.gz
+            beta3-service-index.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 30
