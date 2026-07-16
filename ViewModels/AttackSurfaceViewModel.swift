@@ -5,6 +5,7 @@ final class AttackSurfaceViewModel: ObservableObject {
     private struct EvidenceExport: Encodable {
         let report: AttackSurfaceReport
         let crashCorrelations: [CrashCorrelationResult]
+        let pocWorkflow: PoCWorkflowReport?
     }
     @Published private(set) var report: AttackSurfaceReport?
     @Published private(set) var isRunning = false
@@ -13,6 +14,9 @@ final class AttackSurfaceViewModel: ObservableObject {
     @Published private(set) var catalogFileName: String?
     @Published private(set) var catalogWarnings: [String] = []
     @Published private(set) var crashCorrelations: [CrashCorrelationResult] = []
+    @Published private(set) var pocWorkflow: PoCWorkflowReport?
+    @Published private(set) var pocExportURL: URL?
+    @Published private(set) var isBuildingPoC = false
     @Published private(set) var lastError: String?
 
     var hasCatalog: Bool { !catalog.services.isEmpty }
@@ -57,6 +61,8 @@ final class AttackSurfaceViewModel: ObservableObject {
         report = nil
         exportURL = nil
         crashCorrelations = []
+        pocWorkflow = nil
+        pocExportURL = nil
         lastError = nil
 
         Task {
@@ -97,6 +103,45 @@ final class AttackSurfaceViewModel: ObservableObject {
         }
     }
 
+    func buildPoCWorkflow(
+        profile: DeviceProfile,
+        logger: AuditLogger
+    ) {
+        guard let report, !isBuildingPoC else {
+            lastError = "Run the discovery suite before building a PoC workflow."
+            return
+        }
+        isBuildingPoC = true
+        lastError = nil
+        Task {
+            let workflow = await PoCWorkflowService.run(
+                source: report,
+                catalog: catalog,
+                crashes: crashCorrelations,
+                profile: profile
+            )
+            pocWorkflow = workflow
+            pocExportURL = savePoC(workflow)
+            exportURL = save(report: report)
+            logger.record(ResearchEvent(
+                severity: workflow.controlledImpactConfirmed ? .failure : .info,
+                subsystem: "poc-workflow",
+                message: workflow.status.title,
+                details: [
+                    "lead": workflow.lead.kind.rawValue,
+                    "primitive": workflow.primitiveHypothesis.rawValue,
+                    "repeated": String(workflow.repeatedInDiscoveryRun),
+                    "crossBoot": String(workflow.crossBootConfirmed),
+                    "impact": String(workflow.controlledImpactConfirmed),
+                    "minimizedFields": String(
+                        workflow.minimization?.minimizedFields.count ?? 0
+                    )
+                ]
+            ))
+            isBuildingPoC = false
+        }
+    }
+
     private func save(report: AttackSurfaceReport) -> URL? {
         do {
             let encoder = JSONEncoder()
@@ -104,7 +149,8 @@ final class AttackSurfaceViewModel: ObservableObject {
             encoder.dateEncodingStrategy = .iso8601
             let data = try encoder.encode(EvidenceExport(
                 report: report,
-                crashCorrelations: crashCorrelations
+                crashCorrelations: crashCorrelations,
+                pocWorkflow: pocWorkflow
             ))
             let directory = FileManager.default.urls(
                 for: .documentDirectory,
@@ -115,6 +161,29 @@ final class AttackSurfaceViewModel: ObservableObject {
                 withIntermediateDirectories: true
             )
             let url = directory.appendingPathComponent("attack-surface-latest.json")
+            try data.write(to: url, options: .atomic)
+            return url
+        } catch {
+            lastError = error.localizedDescription
+            return nil
+        }
+    }
+
+    private func savePoC(_ workflow: PoCWorkflowReport) -> URL? {
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(workflow)
+            let directory = FileManager.default.urls(
+                for: .documentDirectory,
+                in: .userDomainMask
+            )[0].appendingPathComponent("ResearchLogs", isDirectory: true)
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true
+            )
+            let url = directory.appendingPathComponent("poc-candidate-latest.json")
             try data.write(to: url, options: .atomic)
             return url
         } catch {

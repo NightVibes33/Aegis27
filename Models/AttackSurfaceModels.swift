@@ -89,7 +89,7 @@ struct AttackSurfaceReport: Codable {
     let catalogParserSurfaces: [FirmwareParserSurface]
     let ioKitResults: [IOKitProbeResult]
     let validation: SandboxValidationReport
-    let previousRunMatchedFingerprints: Int
+    let previousRunMatchedFingerprintKeys: [String]
     let previousRunWasDifferentBoot: Bool
 
     var probedCount: Int { serviceResults.filter(\.wasProbed).count }
@@ -108,6 +108,9 @@ struct AttackSurfaceReport: Codable {
     }
 
     var openedIOKitCount: Int { ioKitResults.filter(\.opened).count }
+    var previousRunMatchedFingerprints: Int {
+        previousRunMatchedFingerprintKeys.count
+    }
     var crossBootMatchedFingerprints: Int {
         previousRunWasDifferentBoot ? previousRunMatchedFingerprints : 0
     }

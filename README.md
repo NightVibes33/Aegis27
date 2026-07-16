@@ -121,6 +121,17 @@ The generator uses firmware strings only to identify candidate dictionary
 keys. It emits a fixed inert marker value and never generates destructive
 operation values, personal-data paths, or exploit payloads.
 
+Version 0.11 adds an in-app **PoC candidate workflow** after discovery. It
+ranks protected-access, correlated service-crash, typed-XPC, IOKit, parser,
+and baseline-XPC evidence; reproduces the strongest typed request; greedily
+removes schema fields while preserving the three-run response fingerprint;
+runs the protected-access validator after every candidate variant; classifies
+the likely primitive family; applies a lead-specific cross-boot gate; and
+exports a self-contained `poc-candidate-latest.json` manifest. A stable reply,
+daemon crash, parser timeout, or open IOKit user client remains a candidate.
+Only an actual protected read or foreign-container listing is labeled
+controlled security impact.
+
 ## Safety behavior
 
 - The target model, OS version, and build are recorded, not hard-coded.

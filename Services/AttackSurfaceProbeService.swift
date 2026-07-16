@@ -107,7 +107,7 @@ enum AttackSurfaceProbeService {
             catalogParserSurfaces: catalog.parserSurfaces,
             ioKitResults: ioKitResults,
             validation: validation,
-            previousRunMatchedFingerprints: AttackSurfaceHistoryStore.matchedFingerprints(
+            previousRunMatchedFingerprintKeys: AttackSurfaceHistoryStore.matchedFingerprintKeys(
                 previous: previous,
                 current: results
             ),

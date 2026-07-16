@@ -25,16 +25,16 @@ enum AttackSurfaceHistoryStore {
         try? data.write(to: url, options: .atomic)
     }
 
-    static func matchedFingerprints(
+    static func matchedFingerprintKeys(
         previous: AttackSurfaceReport?,
         current: [AttackSurfaceServiceResult]
-    ) -> Int {
-        guard let previous else { return 0 }
+    ) -> [String] {
+        guard let previous else { return [] }
         let prior = Set(previous.serviceResults.filter(\.wasProbed).map {
             "\($0.service)|\($0.requestID)|\($0.fingerprint)"
         })
-        return Set(current.filter(\.wasProbed).map {
+        return Array(Set(current.filter(\.wasProbed).map {
             "\($0.service)|\($0.requestID)|\($0.fingerprint)"
-        }).intersection(prior).count
+        }).intersection(prior)).sorted()
     }
 }

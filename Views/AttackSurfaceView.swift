@@ -18,6 +18,7 @@ struct AttackSurfaceView: View {
                 parserSection(report)
                 ioKitSection(report)
                 crashSection
+                pocWorkflowSection(report)
                 validationSection(report)
             }
             if let error = viewModel.lastError {
@@ -209,6 +210,73 @@ struct AttackSurfaceView: View {
                     if let service = result.nearestService {
                         Text("Nearest: \(service) / \(result.nearestRequestID ?? "unknown request")")
                             .font(.caption2.monospaced())
+                    }
+                }
+            }
+        }
+    }
+
+    private func pocWorkflowSection(_ report: AttackSurfaceReport) -> some View {
+        Section("PoC candidate workflow") {
+            Text("Ranks the strongest lead, reproduces and minimizes imported typed XPC schemas, checks impact after every variant, applies the reboot gate, and exports a self-contained evidence manifest.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Button {
+                viewModel.buildPoCWorkflow(
+                    profile: researchViewModel.profile,
+                    logger: researchViewModel.logger
+                )
+            } label: {
+                if viewModel.isBuildingPoC {
+                    ProgressView()
+                } else {
+                    Label("Build PoC candidate package", systemImage: "hammer.fill")
+                }
+            }
+            .disabled(viewModel.isBuildingPoC || viewModel.isRunning)
+
+            if let workflow = viewModel.pocWorkflow {
+                Label(
+                    workflow.status.title,
+                    systemImage: workflow.controlledImpactConfirmed
+                        ? "exclamationmark.shield.fill" : "doc.badge.gearshape"
+                )
+                .font(.headline)
+                .foregroundStyle(workflow.controlledImpactConfirmed ? .red : .secondary)
+                LabeledContent("Lead", value: workflow.lead.title)
+                LabeledContent("Hypothesis", value: workflow.primitiveHypothesis.title)
+                LabeledContent("Repeated", value: String(workflow.repeatedInDiscoveryRun))
+                LabeledContent("Cross-boot", value: String(workflow.crossBootConfirmed))
+                LabeledContent("Controlled impact", value: String(workflow.controlledImpactConfirmed))
+
+                if let minimization = workflow.minimization {
+                    LabeledContent(
+                        "Schema fields",
+                        value: "\(minimization.originalFields.count) → \(minimization.minimizedFields.count)"
+                    )
+                    LabeledContent(
+                        "Reproduced",
+                        value: String(minimization.initialReproductionStable)
+                    )
+                    ForEach(minimization.attempts) { attempt in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(attempt.removedKey.map { "Remove \($0)" } ?? "Full-schema reproduction")
+                                .font(.caption.weight(.semibold))
+                            Text("preserved \(attempt.preservedExpectedFingerprint) • fields \(attempt.remainingKeys.count) • impact \(attempt.protectedAccessConfirmed)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                ForEach(workflow.limitations, id: \.self) { limitation in
+                    Label(limitation, systemImage: "info.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if let url = viewModel.pocExportURL {
+                    ShareLink(item: url) {
+                        Label("Export PoC candidate JSON", systemImage: "square.and.arrow.up")
                     }
                 }
             }
