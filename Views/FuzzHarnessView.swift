@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct FuzzHarnessView: View {
     let catalog: FirmwareProbeCatalog
@@ -7,6 +8,14 @@ struct FuzzHarnessView: View {
 
     @StateObject private var viewModel = FuzzHarnessViewModel()
     @State private var showRunConfirmation = false
+    @State private var showCatalogImporter = false
+    @State private var importedCatalog = FirmwareProbeCatalog.empty
+    @State private var catalogFileName: String?
+    @State private var catalogMessage: String?
+
+    private var effectiveCatalog: FirmwareProbeCatalog {
+        importedCatalog.services.isEmpty ? catalog : importedCatalog
+    }
 
     var body: some View {
         List {
@@ -27,10 +36,35 @@ struct FuzzHarnessView: View {
         .alert("Run real fuzz campaign?", isPresented: $showRunConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Run", role: .destructive) {
-                viewModel.run(catalog: catalog, profile: profile, logger: logger)
+                viewModel.run(
+                    catalog: effectiveCatalog,
+                    profile: profile,
+                    logger: logger
+                )
             }
         } message: {
             Text("This executes malformed parser inputs, destructive mutations inside Aegis's generated corpus, and imported typed XPC requests. It can crash Aegis, crash a reachable service, or reboot the device. Every case is journaled before execution.")
+        }
+        .fileImporter(
+            isPresented: $showCatalogImporter,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            guard case .success(let urls) = result, let url = urls.first else { return }
+            do {
+                let imported = try FirmwareProbeCatalogImporter.load(
+                    from: url,
+                    targetBuild: profile.buildVersion
+                )
+                importedCatalog = imported.catalog
+                catalogFileName = imported.fileName
+                catalogMessage = imported.warnings.isEmpty
+                    ? "Catalog matches this runtime build."
+                    : imported.warnings.joined(separator: " • ")
+                viewModel.xpcEnabled = true
+            } catch {
+                catalogMessage = error.localizedDescription
+            }
         }
     }
 
@@ -62,21 +96,44 @@ struct FuzzHarnessView: View {
                     Text(intensity.title).tag(intensity)
                 }
             }
-            Stepper("Cases: \(viewModel.iterations)", value: $viewModel.iterations, in: 1...300, step: 10)
+            Stepper(
+                "Cases: \(viewModel.iterations)",
+                value: $viewModel.iterations,
+                in: 1...300,
+                step: 10
+            )
             TextField("Seed", value: $viewModel.seed, format: .number)
                 .keyboardType(.numberPad)
 
             Toggle("Parser mutation", isOn: $viewModel.parserEnabled)
             Toggle("Sandbox file mutation", isOn: $viewModel.sandboxFileEnabled)
             Toggle("XPC schema mutation", isOn: $viewModel.xpcEnabled)
-                .disabled(catalog.services.isEmpty)
+                .disabled(effectiveCatalog.services.isEmpty)
 
-            if catalog.services.isEmpty {
-                Text("Import a firmware probe catalog on the Attack Surface screen to enable typed XPC mutation.")
+            Button {
+                showCatalogImporter = true
+            } label: {
+                Label("Import matching firmware catalog", systemImage: "shippingbox.and.arrow.backward")
+            }
+
+            if effectiveCatalog.services.isEmpty {
+                Text("Typed XPC mutation stays disabled until you import a catalog generated from the exact iOS build.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                LabeledContent("Imported XPC schemas", value: String(catalog.services.flatMap(\.requests).count))
+                LabeledContent(
+                    "Imported XPC schemas",
+                    value: String(effectiveCatalog.services.flatMap(\.requests).count)
+                )
+                if let catalogFileName {
+                    LabeledContent("Catalog", value: catalogFileName)
+                }
+            }
+
+            if let catalogMessage {
+                Text(catalogMessage)
+                    .font(.caption)
+                    .foregroundStyle(effectiveCatalog.services.isEmpty ? .red : .secondary)
             }
 
             if viewModel.sandboxFileEnabled {
