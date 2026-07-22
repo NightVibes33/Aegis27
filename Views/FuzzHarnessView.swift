@@ -10,11 +10,28 @@ struct FuzzHarnessView: View {
     @State private var showRunConfirmation = false
     @State private var showCatalogImporter = false
     @State private var importedCatalog = FirmwareProbeCatalog.empty
+    @State private var bundledCatalog = FirmwareProbeCatalog.empty
     @State private var catalogFileName: String?
     @State private var catalogMessage: String?
 
     private var effectiveCatalog: FirmwareProbeCatalog {
-        importedCatalog.services.isEmpty ? catalog : importedCatalog
+        if isExactUsable(importedCatalog) { return importedCatalog }
+        if isExactUsable(catalog) { return catalog }
+        if isExactUsable(bundledCatalog) { return bundledCatalog }
+        return .empty
+    }
+
+    private var effectiveCatalogSource: String? {
+        if isExactUsable(importedCatalog) {
+            return catalogFileName ?? "Manually imported catalog"
+        }
+        if isExactUsable(catalog) {
+            return "Attack Surface catalog"
+        }
+        if isExactUsable(bundledCatalog) {
+            return "\(profile.buildVersion).json (bundled)"
+        }
+        return nil
     }
 
     var body: some View {
@@ -43,7 +60,7 @@ struct FuzzHarnessView: View {
                 )
             }
         } message: {
-            Text("This executes malformed parser inputs, destructive mutations inside Aegis's generated corpus, and imported typed XPC requests. It can crash Aegis, crash a reachable service, or reboot the device. Every case is journaled before execution.")
+            Text("This executes the selected real parser, sandbox-corpus, and exact-build XPC campaigns. A case can terminate Aegis, crash a reachable service, or reboot the device. Every case is journaled before execution.")
         }
         .fileImporter(
             isPresented: $showCatalogImporter,
@@ -59,12 +76,36 @@ struct FuzzHarnessView: View {
                 importedCatalog = imported.catalog
                 catalogFileName = imported.fileName
                 catalogMessage = imported.warnings.isEmpty
-                    ? "Catalog matches this runtime build."
+                    ? "Catalog matches this runtime build. XPC-only defaults applied."
                     : imported.warnings.joined(separator: " • ")
-                viewModel.xpcEnabled = true
+
+                if imported.warnings.isEmpty && isExactUsable(imported.catalog) {
+                    viewModel.configureForAvailableXPCCatalog(imported.catalog)
+                } else {
+                    viewModel.xpcEnabled = false
+                }
             } catch {
                 catalogMessage = error.localizedDescription
+                viewModel.xpcEnabled = false
             }
+        }
+        .task {
+            var available = isExactUsable(catalog) ? catalog : FirmwareProbeCatalog.empty
+
+            if let bundled = FirmwareProbeCatalogImporter.loadBundled(
+                targetBuild: profile.buildVersion
+            ) {
+                bundledCatalog = bundled.catalog
+                if available.services.isEmpty && isExactUsable(bundled.catalog) {
+                    available = bundled.catalog
+                    catalogMessage = "Exact \(profile.buildVersion) catalog loaded automatically."
+                }
+            }
+
+            if isExactUsable(importedCatalog) {
+                available = importedCatalog
+            }
+            viewModel.configureForAvailableXPCCatalog(available)
         }
     }
 
@@ -108,7 +149,7 @@ struct FuzzHarnessView: View {
             Toggle("Parser mutation", isOn: $viewModel.parserEnabled)
             Toggle("Sandbox file mutation", isOn: $viewModel.sandboxFileEnabled)
             Toggle("XPC schema mutation", isOn: $viewModel.xpcEnabled)
-                .disabled(effectiveCatalog.services.isEmpty)
+                .disabled(effectiveCatalog.services.flatMap(\.requests).isEmpty)
 
             Button {
                 showCatalogImporter = true
@@ -116,18 +157,24 @@ struct FuzzHarnessView: View {
                 Label("Import matching firmware catalog", systemImage: "shippingbox.and.arrow.backward")
             }
 
-            if effectiveCatalog.services.isEmpty {
-                Text("Typed XPC mutation stays disabled until you import a catalog generated from the exact iOS build.")
+            if effectiveCatalog.services.flatMap(\.requests).isEmpty {
+                Text("Typed XPC mutation stays disabled until an exact-build catalog is bundled or imported.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
+                Label("Exact-build XPC catalog ready", systemImage: "checkmark.shield.fill")
+                    .foregroundStyle(.green)
+                LabeledContent("Build", value: effectiveCatalog.sourceBuild)
                 LabeledContent(
-                    "Imported XPC schemas",
+                    "XPC schemas",
                     value: String(effectiveCatalog.services.flatMap(\.requests).count)
                 )
-                if let catalogFileName {
-                    LabeledContent("Catalog", value: catalogFileName)
+                if let effectiveCatalogSource {
+                    LabeledContent("Catalog", value: effectiveCatalogSource)
                 }
+                Text("The harness automatically selects 300 XPC-only cases when the exact catalog first becomes available.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             if let catalogMessage {
@@ -169,6 +216,7 @@ struct FuzzHarnessView: View {
                 } label: {
                     Label("Start fuzz campaign", systemImage: "bolt.shield.fill")
                 }
+                .disabled(viewModel.xpcEnabled && effectiveCatalog.services.flatMap(\.requests).isEmpty)
             }
         }
     }
@@ -223,5 +271,10 @@ struct FuzzHarnessView: View {
                 }
             }
         }
+    }
+
+    private func isExactUsable(_ value: FirmwareProbeCatalog) -> Bool {
+        value.sourceBuild == profile.buildVersion &&
+            !value.services.flatMap(\.requests).isEmpty
     }
 }

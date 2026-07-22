@@ -31,6 +31,37 @@ enum FirmwareProbeCatalogImporter {
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
 
         let data = try Data(contentsOf: url, options: [.mappedIfSafe])
+        return try decode(
+            data: data,
+            fileName: url.lastPathComponent,
+            targetBuild: targetBuild
+        )
+    }
+
+    static func loadBundled(
+        targetBuild: String
+    ) -> FirmwareCatalogImportResult? {
+        let candidates = [
+            Bundle.main.url(
+                forResource: targetBuild,
+                withExtension: "json",
+                subdirectory: "FirmwareCatalogs"
+            ),
+            Bundle.main.url(
+                forResource: targetBuild,
+                withExtension: "json"
+            )
+        ]
+
+        guard let url = candidates.compactMap({ $0 }).first else { return nil }
+        return try? load(from: url, targetBuild: targetBuild)
+    }
+
+    private static func decode(
+        data: Data,
+        fileName: String,
+        targetBuild: String
+    ) throws -> FirmwareCatalogImportResult {
         guard data.count <= byteLimit else { throw FirmwareProbeCatalogError.oversized }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
@@ -48,7 +79,7 @@ enum FirmwareProbeCatalogImporter {
         }
         return FirmwareCatalogImportResult(
             catalog: sanitized,
-            fileName: url.lastPathComponent,
+            fileName: fileName,
             warnings: warnings
         )
     }
