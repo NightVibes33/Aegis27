@@ -26,9 +26,13 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: cloud-firmware-lab-${{ github.ref }}-${{ inputs.build || '24A5380h' }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
-    runs-on: macos-26
+    runs-on: macos-26-intel
     timeout-minutes: 120
     env:
       TARGET_DEVICE: ${{ inputs.device || 'iPhone17,3' }}
@@ -49,6 +53,17 @@ jobs:
           test "$MAXIMUM_PROGRAMS" -ge 1
           test "$MAXIMUM_PROGRAMS" -le 2048
 
+      - name: Reclaim firmware-analysis disk
+        shell: bash
+        run: |
+          set -euo pipefail
+          df -h /
+          sudo rm -rf /Applications/Xcode*.app || true
+          sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/* || true
+          rm -rf "$HOME/Library/Developer/Xcode/DerivedData" || true
+          brew cleanup --prune=all || true
+          df -h /
+
       - name: Install firmware tooling
         shell: bash
         run: |
@@ -58,37 +73,73 @@ jobs:
           brew install --formula blacktop/tap/ipsw
           ipsw version | tee ipsw-version.txt
 
-      - name: Resolve and download the exact IPSW
+      - name: Resolve exact IPSW URL without downloading it
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p firmware/download firmware/extracted firmware/report
+          mkdir -p firmware/extracted firmware/report
           ipsw --no-color download appledb \
             --os iOS \
             --type ipsw \
             --device "$TARGET_DEVICE" \
             --build "$TARGET_BUILD" \
-            --output firmware/download \
-            --confirm
-          IPSW_PATH="$(find firmware/download -type f -name '*.ipsw' -print -quit)"
-          test -n "$IPSW_PATH"
-          echo "IPSW_PATH=$IPSW_PATH" >> "$GITHUB_ENV"
-          shasum -a 256 "$IPSW_PATH" > firmware/ipsw.sha256
-          ipsw --no-color info --json "$IPSW_PATH" > firmware/ipsw-info.json
-          grep -q "$TARGET_BUILD" firmware/ipsw-info.json
+            --urls \
+            --json > firmware/appledb-query.json
 
-      - name: Extract launchd and sandbox metadata
+          IPSW_URL="$(python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import re
+
+          path = pathlib.Path('firmware/appledb-query.json')
+          text = path.read_text(errors='replace')
+          urls = []
+
+          def walk(value):
+              if isinstance(value, dict):
+                  for item in value.values():
+                      walk(item)
+              elif isinstance(value, list):
+                  for item in value:
+                      walk(item)
+              elif isinstance(value, str) and value.startswith('https://') and '.ipsw' in value:
+                  urls.append(value)
+
+          try:
+              walk(json.loads(text))
+          except json.JSONDecodeError:
+              pass
+
+          urls.extend(re.findall(r'https://[^\s"\']+?\.ipsw(?:\?[^\s"\']*)?', text))
+          device = os.environ['TARGET_DEVICE']
+          build = os.environ['TARGET_BUILD']
+          ordered = sorted(set(urls), key=lambda url: (device not in url, build not in url, len(url)))
+          if not ordered:
+              raise SystemExit('AppleDB returned no IPSW URL')
+          print(ordered[0])
+          PY
+          )"
+
+          [[ "$IPSW_URL" == https://*.ipsw* ]]
+          echo "IPSW_URL=$IPSW_URL" >> "$GITHUB_ENV"
+          printf '%s\n' "$IPSW_URL" > firmware/ipsw-source-url.txt
+          shasum -a 256 firmware/ipsw-source-url.txt > firmware/source-url.sha256
+          ipsw --no-color info --remote "$IPSW_URL" --json > firmware/ipsw-info.json
+          grep -q "$TARGET_BUILD" firmware/ipsw-info.json
+          grep -q "$TARGET_DEVICE" firmware/ipsw-info.json
+
+      - name: Extract launchd and sandbox metadata remotely
         shell: bash
         run: |
           set -euo pipefail
-          ipsw --no-color extract --files \
+          ipsw --no-color extract --remote "$IPSW_URL" --files \
             --pattern '.*(Library/LaunchDaemons|System/Library/LaunchDaemons)/.*\.plist$' \
-            --output firmware/extracted \
-            "$IPSW_PATH"
-          ipsw --no-color extract --files \
+            --output firmware/extracted
+          ipsw --no-color extract --remote "$IPSW_URL" --files \
             --pattern '.*System/Library/Sandbox/Profiles/.*' \
-            --output firmware/extracted \
-            "$IPSW_PATH" || true
+            --output firmware/extracted || true
+          df -h /
 
       - name: Plan bounded service-binary extraction
         shell: bash
@@ -101,11 +152,22 @@ jobs:
           test -s firmware/program-regex.txt
           test -s firmware/program-paths.txt
 
-      - name: Extract referenced service binaries
+      - name: Extract referenced service binaries remotely
         shell: bash
         run: |
           set -euo pipefail
-          python3 -c 'import os,pathlib,subprocess; pattern=pathlib.Path("firmware/program-regex.txt").read_text().strip(); subprocess.run(["ipsw","--no-color","extract","--files","--pattern",pattern,"--output","firmware/extracted",os.environ["IPSW_PATH"]],check=True)'
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import subprocess
+
+          pattern = pathlib.Path('firmware/program-regex.txt').read_text().strip()
+          subprocess.run([
+              'ipsw', '--no-color', 'extract', '--remote', os.environ['IPSW_URL'],
+              '--files', '--pattern', pattern, '--output', 'firmware/extracted'
+          ], check=True)
+          PY
+          df -h /
 
       - name: Build evidence report and inert catalog
         shell: bash
@@ -115,13 +177,16 @@ jobs:
             --device "$TARGET_DEVICE" \
             --build "$TARGET_BUILD" \
             --output-dir firmware/report
+          cp firmware/appledb-query.json firmware/report/
           cp firmware/ipsw-info.json firmware/report/
-          cp firmware/ipsw.sha256 firmware/report/
+          cp firmware/ipsw-source-url.txt firmware/report/
+          cp firmware/source-url.sha256 firmware/report/
           cp firmware/program-paths.txt firmware/report/
           cp ipsw-version.txt firmware/report/
           python3 -m json.tool firmware/report/aegis27-probe-catalog.json >/dev/null
           python3 -m json.tool firmware/report/firmware-lab-report.json >/dev/null
           shasum -a 256 firmware/report/*.json > firmware/report/JSON-SHA256SUMS
+          rm -rf firmware/extracted
 
       - name: Publish exact compact catalog to the app
         if: github.ref == 'refs/heads/main'
