@@ -20,6 +20,7 @@ final class FuzzHarnessViewModel: ObservableObject {
     @Published private(set) var lastError: String?
 
     private var runTask: Task<Void, Never>?
+    private var appliedAutomaticXPCCatalogDefaults = false
 
     init() {
         pendingRecovery = FuzzJournalStore.pendingIncompleteCase()
@@ -31,6 +32,22 @@ final class FuzzHarnessViewModel: ObservableObject {
         if sandboxFileEnabled { values.append(.sandboxFileMutation) }
         if xpcEnabled { values.append(.xpcSchemaMutation) }
         return values
+    }
+
+    func configureForAvailableXPCCatalog(_ catalog: FirmwareProbeCatalog) {
+        guard !appliedAutomaticXPCCatalogDefaults,
+              pendingRecovery == nil,
+              !catalog.services.flatMap(\.requests).isEmpty else {
+            return
+        }
+
+        appliedAutomaticXPCCatalogDefaults = true
+        iterations = 300
+        parserEnabled = false
+        sandboxFileEnabled = false
+        xpcEnabled = true
+        allowDestructiveSandboxMutations = false
+        lastError = nil
     }
 
     func useRecoveredCase() {
@@ -46,6 +63,10 @@ final class FuzzHarnessViewModel: ObservableObject {
         guard !isRunning else { return }
         guard !enabledKinds.isEmpty else {
             lastError = "Enable at least one campaign."
+            return
+        }
+        guard !xpcEnabled || !catalog.services.flatMap(\.requests).isEmpty else {
+            lastError = "No exact-build XPC catalog is available."
             return
         }
         guard !sandboxFileEnabled || allowDestructiveSandboxMutations else {
