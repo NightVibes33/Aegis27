@@ -1,0 +1,229 @@
+{
+  "formatVersion": 1,
+  "sourceBuild": "24A5380h",
+  "generatedAt": "2026-07-25T07:00:00Z",
+  "services": [
+    {
+      "service": "com.apple.mobilegestalt.xpc",
+      "subsystem": "MobileGestalt",
+      "binaryPath": null,
+      "requests": [
+        {
+          "id": "empty-dictionary",
+          "label": "Empty dictionary baseline",
+          "source": "Runtime-observed on iPhone17,3 / 24A5380h; generic inert discovery",
+          "fields": []
+        },
+        {
+          "id": "inert-request-marker",
+          "label": "Inert request marker",
+          "source": "Runtime-observed on iPhone17,3 / 24A5380h; generic inert discovery",
+          "fields": [
+            {
+              "key": "request",
+              "type": "string",
+              "stringValue": "com.nightvibes33.Aegis27.bounded-probe",
+              "unsignedIntegerValue": null,
+              "booleanValue": null
+            }
+          ]
+        },
+        {
+          "id": "inert-command-marker",
+          "label": "Inert command marker",
+          "source": "Runtime-observed on iPhone17,3 / 24A5380h; generic inert discovery",
+          "fields": [
+            {
+              "key": "command",
+              "type": "string",
+              "stringValue": "com.nightvibes33.Aegis27.bounded-probe",
+              "unsignedIntegerValue": null,
+              "booleanValue": null
+            }
+          ]
+        },
+        {
+          "id": "inert-operation-marker",
+          "label": "Inert operation marker",
+          "source": "Runtime-observed on iPhone17,3 / 24A5380h; generic inert discovery",
+          "fields": [
+            {
+              "key": "operation",
+              "type": "string",
+              "stringValue": "com.nightvibes33.Aegis27.bounded-probe",
+              "unsignedIntegerValue": null,
+              "booleanValue": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "service": "com.apple.cfprefsd.daemon",
+      "subsystem": "Preferences",
+      "binaryPath": null,
+      "requests": [
+        {
+          "id": "empty-dictionary",
+          "label": "Empty dictionary baseline",
+          "source": "Runtime-observed on iPhone17,3 / 24A5380h; generic inert discovery",
+          "fields": []
+        },
+        {
+          "id": "inert-request-marker",
+          "label": "Inert request marker",
+          "source": "Runtime-observed on iPhone17,3 / 24A5380h; generic inert discovery",
+          "fields": [
+            {
+              "key": "request",
+              "type": "string",
+              "stringValue": "com.nightvibes33.Aegis27.bounded-probe",
+              "unsignedIntegerValue": null,
+              "booleanValue": null
+            }
+          ]
+        },
+        {
+          "id": "inert-client-marker",
+          "label": "Inert client marker",
+          "source": "Runtime-observed on iPhone17,3 / 24A5380h; generic inert discovery",
+          "fields": [
+            {
+              "key": "client",
+              "type": "string",
+              "stringValue": "com.nightvibes33.Aegis27.v08",
+              "unsignedIntegerValue": null,
+              "booleanValue": null
+            }
+          ]
+        },
+        {
+          "id": "zero-version",
+          "label": "Zero version boundary",
+          "source": "Runtime-observed on iPhone17,3 / 24A5380h; generic inert discovery",
+          "fields": [
+            {
+              "key": "version",
+              "type": "unsignedInteger",
+              "stringValue": null,
+              "unsignedIntegerValue": 0,
+              "booleanValue": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "service": "com.apple.mobileassetd",
+      "subsystem": "MobileAsset",
+      "binaryPath": null,
+      "requests": [
+        {
+          "id": "empty-dictionary",
+          "label": "Empty dictionary baseline",
+          "source": "Runtime-observed on iPhone17,3 / 24A5380h; generic inert discovery",
+          "fields": []
+        },
+        {
+          "id": "inert-operation-marker",
+          "label": "Inert operation marker",
+          "source": "Runtime-observed on iPhone17,3 / 24A5380h; generic inert discovery",
+          "fields": [
+            {
+              "key": "operation",
+              "type": "string",
+              "stringValue": "com.nightvibes33.Aegis27.bounded-probe",
+              "unsignedIntegerValue": null,
+              "booleanValue": null
+            }
+          ]
+        },
+        {
+          "id": "inert-identifier-marker",
+          "label": "Inert identifier marker",
+          "source": "Runtime-observed on iPhone17,3 / 24A5380h; generic inert discovery",
+          "fields": [
+            {
+              "key": "identifier",
+              "type": "string",
+              "stringValue": "com.nightvibes33.Aegis27.bounded-probe",
+              "unsignedIntegerValue": null,
+              "booleanValue": null
+            }
+          ]
+        },
+        {
+          "id": "zero-flags",
+          "label": "Zero flags boundary",
+          "source": "Runtime-observed on iPhone17,3 / 24A5380h; generic inert discovery",
+          "fields": [
+            {
+              "key": "flags",
+              "type": "unsignedInteger",
+              "stringValue": null,
+              "unsignedIntegerValue": 0,
+              "booleanValue": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "service": "com.apple.itunesstored",
+      "subsystem": "Media services",
+      "binaryPath": null,
+      "requests": [
+        {
+          "id": "empty-dictionary",
+          "label": "Empty dictionary baseline",
+          "source": "Runtime-observed on iPhone17,3 / 24A5380h; generic inert discovery",
+          "fields": []
+        },
+        {
+          "id": "inert-request-marker",
+          "label": "Inert request marker",
+          "source": "Runtime-observed on iPhone17,3 / 24A5380h; generic inert discovery",
+          "fields": [
+            {
+              "key": "request",
+              "type": "string",
+              "stringValue": "com.nightvibes33.Aegis27.bounded-probe",
+              "unsignedIntegerValue": null,
+              "booleanValue": null
+            }
+          ]
+        },
+        {
+          "id": "inert-client-marker",
+          "label": "Inert client marker",
+          "source": "Runtime-observed on iPhone17,3 / 24A5380h; generic inert discovery",
+          "fields": [
+            {
+              "key": "client",
+              "type": "string",
+              "stringValue": "com.nightvibes33.Aegis27.v08",
+              "unsignedIntegerValue": null,
+              "booleanValue": null
+            }
+          ]
+        },
+        {
+          "id": "zero-version",
+          "label": "Zero version boundary",
+          "source": "Runtime-observed on iPhone17,3 / 24A5380h; generic inert discovery",
+          "fields": [
+            {
+              "key": "version",
+              "type": "unsignedInteger",
+              "stringValue": null,
+              "unsignedIntegerValue": 0,
+              "booleanValue": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "parserSurfaces": [],
+  "ioKitClasses": []
+}
