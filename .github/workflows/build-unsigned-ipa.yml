@@ -1,4 +1,4 @@
-name: Build unsigned research IPA
+name: Build unsigned Aegis27 and CanaryBox IPAs
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
 jobs:
   build:
     runs-on: macos-26
-    timeout-minutes: 30
+    timeout-minutes: 40
 
     steps:
       - name: Check out source
@@ -37,40 +37,64 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Build device application without signing
+      - name: Build both device applications without signing
         shell: bash
         run: |
           set -euo pipefail
-          xcodebuild \
-            -project Aegis27.xcodeproj \
-            -scheme Aegis27 \
-            -configuration Release \
-            -sdk iphoneos \
-            -derivedDataPath build/DerivedData \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY='' \
-            AEGIS_SOURCE_REVISION="$GITHUB_SHA" \
-            clean build
+          for scheme in Aegis27 CanaryBox; do
+            xcodebuild \
+              -project Aegis27.xcodeproj \
+              -scheme "$scheme" \
+              -configuration Release \
+              -sdk iphoneos \
+              -derivedDataPath build/DerivedData \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY='' \
+              AEGIS_SOURCE_REVISION="$GITHUB_SHA" \
+              build
+          done
 
-      - name: Package unsigned IPA
+      - name: Verify and package both unsigned IPAs
         shell: bash
         run: |
           set -euo pipefail
-          APP_PATH="$(find build/DerivedData/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' -print -quit)"
-          test -n "$APP_PATH"
-          mkdir -p build/package/Payload
-          cp -R "$APP_PATH" build/package/Payload/
-          cd build/package
-          /usr/bin/ditto -c -k --sequesterRsrc --keepParent Payload Aegis27-unsigned.ipa
+          PRODUCTS="build/DerivedData/Build/Products/Release-iphoneos"
+          AEGIS_APP="$PRODUCTS/Aegis27.app"
+          CANARY_APP="$PRODUCTS/CanaryBox.app"
+          test -d "$AEGIS_APP"
+          test -d "$CANARY_APP"
+
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$AEGIS_APP/Info.plist")" = "com.nightvibes33.Aegis27.v08"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$CANARY_APP/Info.plist")" = "com.nightvibes33.CanaryBox"
+          test ! -e "$AEGIS_APP/embedded.mobileprovision"
+          test ! -e "$CANARY_APP/embedded.mobileprovision"
+
+          rm -rf build/package
+          mkdir -p build/package/aegis/Payload build/package/canary/Payload build/artifacts
+          cp -R "$AEGIS_APP" build/package/aegis/Payload/
+          cp -R "$CANARY_APP" build/package/canary/Payload/
+
+          (
+            cd build/package/aegis
+            /usr/bin/ditto -c -k --sequesterRsrc --keepParent Payload ../../artifacts/Aegis27-unsigned.ipa
+          )
+          (
+            cd build/package/canary
+            /usr/bin/ditto -c -k --sequesterRsrc --keepParent Payload ../../artifacts/CanaryBox-unsigned.ipa
+          )
+          cd build/artifacts
           /usr/bin/shasum -a 256 Aegis27-unsigned.ipa > Aegis27-unsigned.ipa.sha256
+          /usr/bin/shasum -a 256 CanaryBox-unsigned.ipa > CanaryBox-unsigned.ipa.sha256
 
-      - name: Upload unsigned IPA
+      - name: Upload both unsigned IPAs
         uses: actions/upload-artifact@v4
         with:
-          name: Aegis27-unsigned-${{ github.sha }}
+          name: Aegis27-CanaryBox-unsigned-${{ github.sha }}
           path: |
-            build/package/Aegis27-unsigned.ipa
-            build/package/Aegis27-unsigned.ipa.sha256
+            build/artifacts/Aegis27-unsigned.ipa
+            build/artifacts/Aegis27-unsigned.ipa.sha256
+            build/artifacts/CanaryBox-unsigned.ipa
+            build/artifacts/CanaryBox-unsigned.ipa.sha256
           if-no-files-found: error
           retention-days: 14
