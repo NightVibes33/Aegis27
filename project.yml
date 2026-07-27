@@ -71,7 +71,7 @@ targets:
           - Info.plist
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.nightvibes33.Aegis27.BoundaryShare
+        PRODUCT_BUNDLE_IDENTIFIER: com.nightvibes33.Aegis27.v08.BoundaryShare
         PRODUCT_NAME: AegisBoundaryShare
         INFOPLIST_FILE: AegisShareExtension/Info.plist
         CURRENT_PROJECT_VERSION: 16
