@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct Aegis27App: App {
     @StateObject private var viewModel = ResearchViewModel()
+    @StateObject private var transportCoordinator = BoundaryTransportCoordinator()
     @State private var showFuzzerHarness = false
     @State private var showBoundaryLab = false
 
@@ -10,6 +11,10 @@ struct Aegis27App: App {
         WindowGroup {
             ContentView()
                 .environmentObject(viewModel)
+                .environmentObject(transportCoordinator)
+                .onOpenURL { url in
+                    transportCoordinator.handleIncomingURL(url)
+                }
                 .overlay(alignment: .bottomTrailing) {
                     VStack(spacing: 12) {
                         Button {
@@ -40,6 +45,7 @@ struct Aegis27App: App {
                 .sheet(isPresented: $showBoundaryLab) {
                     NavigationStack {
                         BoundaryLabView()
+                            .environmentObject(transportCoordinator)
                             .toolbar {
                                 ToolbarItem(placement: .topBarTrailing) {
                                     Button("Done") {
