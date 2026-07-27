@@ -20,6 +20,40 @@
     <string>$(MARKETING_VERSION)</string>
     <key>CFBundleVersion</key>
     <string>$(CURRENT_PROJECT_VERSION)</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.nightvibes33.CanaryBox.boundary</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>canarybox-boundary</string>
+            </array>
+        </dict>
+    </array>
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.nightvibes33.canarybox.boundary-envelope</string>
+            <key>UTTypeDescription</key>
+            <string>CanaryBox Boundary Envelope</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.json</string>
+                <string>public.data</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>aegisboundary</string>
+                </array>
+                <key>public.mime-type</key>
+                <string>application/vnd.nightvibes33.canarybox-boundary+json</string>
+            </dict>
+        </dict>
+    </array>
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>UIRequiresFullScreen</key>
