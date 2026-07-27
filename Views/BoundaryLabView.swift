@@ -27,7 +27,7 @@ struct BoundaryLabView: View {
                 }
                 Text(manifestMessage)
                     .font(.caption)
-                    .foregroundStyle(manifest == nil ? .secondary : .green)
+                    .foregroundStyle(manifest == nil ? Color.secondary : Color.green)
 
                 if let manifest {
                     LabeledContent("Bundle", value: manifest.bundleIdentifier)
