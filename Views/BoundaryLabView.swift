@@ -19,7 +19,18 @@ struct BoundaryLabView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("Manifest") {
+            Section("Sanctioned transport tests") {
+                NavigationLink {
+                    BoundaryTransportView()
+                } label: {
+                    Label("Open Transport Lab", systemImage: "arrow.left.arrow.right.square")
+                }
+                Text("Tests user-mediated Files providers, NSFileCoordinator, share/Open-In delivery, pasteboard, and strict URL callback replies. These are intentional handoffs, not sandbox escapes.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Direct-access baseline manifest") {
                 Button {
                     showingImporter = true
                 } label: {
@@ -37,7 +48,7 @@ struct BoundaryLabView: View {
                 }
             }
 
-            Section("Boundary checks") {
+            Section("Direct-access baseline checks") {
                 Button {
                     run()
                 } label: {
@@ -51,7 +62,7 @@ struct BoundaryLabView: View {
             }
 
             if let report {
-                Section("Latest report") {
+                Section("Latest direct-access report") {
                     ForEach(report.checks) { result in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
