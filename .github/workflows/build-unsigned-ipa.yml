@@ -38,11 +38,17 @@ jobs:
         run: xcodegen generate
 
       - name: Build both device applications without signing
+        id: compile
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p build/logs
+          failed=false
+          : > build/logs/compiler-summary.txt
+
           for scheme in Aegis27 CanaryBox; do
-            xcodebuild \
+            log="build/logs/${scheme}.log"
+            if xcodebuild \
               -project Aegis27.xcodeproj \
               -scheme "$scheme" \
               -configuration Release \
@@ -52,8 +58,37 @@ jobs:
               CODE_SIGNING_REQUIRED=NO \
               CODE_SIGN_IDENTITY='' \
               AEGIS_SOURCE_REVISION="$GITHUB_SHA" \
-              build
+              build >"$log" 2>&1; then
+              echo "$scheme build succeeded"
+            else
+              failed=true
+              {
+                echo "===== $scheme ====="
+                grep -E 'error:|fatal error:|BUILD FAILED|The following build commands failed' "$log" | tail -250 || true
+                echo
+                tail -80 "$log"
+                echo
+              } >> build/logs/compiler-summary.txt
+            fi
           done
+
+          echo "failed=$failed" >> "$GITHUB_OUTPUT"
+
+      - name: Upload compiler diagnostics
+        if: steps.compile.outputs.failed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aegis27-CanaryBox-build-diagnostics-${{ github.sha }}
+          path: build/logs/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Fail when compilation failed
+        if: steps.compile.outputs.failed == 'true'
+        shell: bash
+        run: |
+          cat build/logs/compiler-summary.txt
+          exit 1
 
       - name: Verify and package both unsigned IPAs
         shell: bash
