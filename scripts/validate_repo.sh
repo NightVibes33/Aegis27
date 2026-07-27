@@ -55,7 +55,7 @@ fi
 
 grep -q 'PRODUCT_BUNDLE_IDENTIFIER: com.nightvibes33.Aegis27.v08' project.yml
 grep -q 'PRODUCT_BUNDLE_IDENTIFIER: com.nightvibes33.CanaryBox' project.yml
-grep -q 'PRODUCT_BUNDLE_IDENTIFIER: com.nightvibes33.Aegis27.BoundaryShare' project.yml
+grep -q 'PRODUCT_BUNDLE_IDENTIFIER: com.nightvibes33.Aegis27.v08.BoundaryShare' project.yml
 grep -q 'MARKETING_VERSION: 0.17.0' project.yml
 grep -q 'CURRENT_PROJECT_VERSION: 16' project.yml
 grep -q 'canarybox-boundary' CanaryBox/Info.plist
