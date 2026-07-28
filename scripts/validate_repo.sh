@@ -8,10 +8,14 @@ required=(
   App/Aegis27App.swift
   Models/BoundaryLabModels.swift
   Models/BoundaryTransportModels.swift
+  Models/CrashTriageModels.swift
   Services/BoundaryLabService.swift
   Services/BoundaryTransportCoordinator.swift
+  Services/CrashTriageService.swift
+  ViewModels/CrashTriageViewModel.swift
   Views/BoundaryLabView.swift
   Views/BoundaryTransportView.swift
+  Views/CrashTriageView.swift
   CanaryBox/CanaryBoxApp.swift
   CanaryBox/CanaryModels.swift
   CanaryBox/CanaryStore.swift
@@ -20,6 +24,7 @@ required=(
   AegisShareExtension/ShareViewController.swift
   AegisShareExtension/Info.plist
   Views/ContentView.swift
+  docs/CRASH_TRIAGE.md
   .github/workflows/build-unsigned-ipa.yml
   .github/workflows/cloud-firmware-lab.yml
   scripts/cloud_firmware_lab.py
@@ -53,11 +58,17 @@ if grep -R --line-number --include='*.swift' -E 'removeItem\(atPath:|truncateFil
   exit 1
 fi
 
+# Crash triage must remain limited to Aegis-owned Application Support files and public parser APIs.
+grep -q 'AegisCrashTriage' Services/CrashTriageService.swift
+grep -q 'maximumCorpusBytes = 4 \* 1024 \* 1024' Services/CrashTriageService.swift
+grep -q 'CGImageSourceCreateThumbnailAtIndex' Services/CrashTriageService.swift
+grep -q 'pending-case.json' Services/CrashTriageService.swift
+grep -q 'minimizationSessionID' Models/CrashTriageModels.swift
 grep -q 'PRODUCT_BUNDLE_IDENTIFIER: com.nightvibes33.Aegis27.v08' project.yml
 grep -q 'PRODUCT_BUNDLE_IDENTIFIER: com.nightvibes33.CanaryBox' project.yml
 grep -q 'PRODUCT_BUNDLE_IDENTIFIER: com.nightvibes33.Aegis27.v08.BoundaryShare' project.yml
-grep -q 'MARKETING_VERSION: 0.17.0' project.yml
-grep -q 'CURRENT_PROJECT_VERSION: 16' project.yml
+grep -q 'MARKETING_VERSION: 0.18.0' project.yml
+grep -q 'CURRENT_PROJECT_VERSION: 17' project.yml
 grep -q 'canarybox-boundary' CanaryBox/Info.plist
 grep -q 'aegis27-boundary' Resources/Info.plist
 grep -q 'com.nightvibes33.canarybox.boundary-envelope' Resources/Info.plist
