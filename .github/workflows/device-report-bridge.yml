@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   analyze:
+    if: github.event.client_payload.kind != 'ipsw-patch-diff'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
