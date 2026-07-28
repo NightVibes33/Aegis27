@@ -42,7 +42,7 @@ struct RunnerBridgeView: View {
             }
 
             Section("Automatic flow") {
-                Text("After a deep scan or attack-surface run, Aegis27 uploads the generated report to an unpublished draft release, triggers the free public-repository runner, waits for its compact analysis, and downloads that result automatically.")
+                Text("Aegis27 uploads compact requests and reports to an unpublished draft release, triggers the repository runner, and downloads the compact result. Device-report analysis usually finishes quickly. An exact IPSW patch diff downloads two full Apple firmware images and can continue after the app stops polling; reopen this screen or the Patch-Diff Lab to check again.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 if let url = bridge.lastResultURL {
