@@ -1,0 +1,302 @@
+name: Compare exact iOS IPSWs
+
+on:
+  workflow_dispatch:
+    inputs:
+      device:
+        description: Apple hardware identifier
+        required: true
+        default: iPhone17,3
+        type: string
+      base_build:
+        description: Older exact iOS build identifier
+        required: true
+        type: string
+      target_build:
+        description: Newer exact iOS build identifier
+        required: true
+        type: string
+      surfaces:
+        description: Comma-separated firmware,launchd,entitlements,featureFlags,sandbox,functionStarts,cStrings,files
+        required: true
+        default: firmware,launchd,entitlements,featureFlags,sandbox,functionStarts,cStrings
+        type: string
+      maximum_candidates:
+        description: Maximum ranked static-review candidates
+        required: true
+        default: "100"
+        type: string
+  repository_dispatch:
+    types: [aegis27-device-report]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ipsw-patch-diff-${{ github.event.client_payload.asset_id || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  analyze:
+    if: github.event_name == 'workflow_dispatch' || github.event.client_payload.kind == 'ipsw-patch-diff'
+    runs-on: macos-26-intel
+    timeout-minutes: 240
+    env:
+      ASSET_ID: ${{ github.event.client_payload.asset_id }}
+      RELEASE_ID: ${{ github.event.client_payload.release_id }}
+      EXPECTED_SHA256: ${{ github.event.client_payload.sha256 }}
+      REPORT_KIND: ${{ github.event.client_payload.kind }}
+      GH_TOKEN: ${{ github.token }}
+      MANUAL_DEVICE: ${{ inputs.device }}
+      MANUAL_BASE_BUILD: ${{ inputs.base_build }}
+      MANUAL_TARGET_BUILD: ${{ inputs.target_build }}
+      MANUAL_SURFACES: ${{ inputs.surfaces }}
+      MANUAL_MAXIMUM_CANDIDATES: ${{ inputs.maximum_candidates }}
+
+    steps:
+      - name: Check out Aegis27
+        uses: actions/checkout@v4
+
+      - name: Prepare and validate request
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p firmware/request firmware/report firmware/raw firmware/cache
+
+          if [[ "$GITHUB_EVENT_NAME" == "repository_dispatch" ]]; then
+            [[ "$ASSET_ID" =~ ^[0-9]+$ ]]
+            [[ "$RELEASE_ID" =~ ^[0-9]+$ ]]
+            [[ "$EXPECTED_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]
+            test "$REPORT_KIND" = "ipsw-patch-diff"
+            curl --fail --location --silent --show-error \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/octet-stream" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/assets/$ASSET_ID" \
+              --output firmware/request/request.json
+            ACTUAL_SHA256="$(shasum -a 256 firmware/request/request.json | awk '{print $1}')"
+            ACTUAL_SHA256_LOWER="$(printf '%s' "$ACTUAL_SHA256" | tr '[:upper:]' '[:lower:]')"
+            EXPECTED_SHA256_LOWER="$(printf '%s' "$EXPECTED_SHA256" | tr '[:upper:]' '[:lower:]')"
+            test "$ACTUAL_SHA256_LOWER" = "$EXPECTED_SHA256_LOWER"
+          else
+            python3 - <<'PY'
+          import datetime as dt
+          import json
+          import os
+          import pathlib
+          import uuid
+
+          surfaces = [item.strip() for item in os.environ["MANUAL_SURFACES"].split(",") if item.strip()]
+          request = {
+              "formatVersion": 1,
+              "kind": "ipsw-patch-diff",
+              "requestID": str(uuid.uuid4()),
+              "device": os.environ["MANUAL_DEVICE"],
+              "baseBuild": os.environ["MANUAL_BASE_BUILD"],
+              "targetBuild": os.environ["MANUAL_TARGET_BUILD"],
+              "surfaces": surfaces,
+              "generatedAt": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+              "sourceBundleIdentifier": "com.nightvibes33.Aegis27.v08",
+              "maximumCandidates": int(os.environ["MANUAL_MAXIMUM_CANDIDATES"]),
+          }
+          pathlib.Path("firmware/request/request.json").write_text(json.dumps(request, indent=2, sort_keys=True) + "\n")
+          PY
+          fi
+
+          python3 scripts/patch_diff_lab.py validate firmware/request/request.json \
+            --flags-output firmware/request/diff-flags.txt \
+            --env-output firmware/request/request.env
+          cat firmware/request/request.env >> "$GITHUB_ENV"
+
+      - name: Reclaim firmware-analysis disk
+        shell: bash
+        run: |
+          set -euo pipefail
+          df -h /
+          sudo rm -rf /Applications/Xcode*.app || true
+          sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/* || true
+          rm -rf "$HOME/Library/Developer/Xcode/DerivedData" || true
+          brew cleanup --prune=all || true
+          df -h /
+
+      - name: Install firmware tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew tap blacktop/tap
+          brew trust blacktop/tap
+          brew install --formula blacktop/tap/ipsw
+          ipsw version | tee firmware/report/ipsw-version.txt
+
+      - name: Resolve exact Apple IPSW URLs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          resolve_url() {
+            local build="$1"
+            local output="$2"
+            ipsw --no-color download appledb \
+              --os iOS \
+              --type ipsw \
+              --device "$PATCH_DEVICE" \
+              --build "$build" \
+              --urls \
+              --json > "$output"
+            python3 - "$PATCH_DEVICE" "$build" "$output" <<'PY'
+          import json
+          import pathlib
+          import re
+          import sys
+
+          device, build, file_name = sys.argv[1:]
+          text = pathlib.Path(file_name).read_text(errors="replace")
+          urls = []
+          def walk(value):
+              if isinstance(value, dict):
+                  for item in value.values():
+                      walk(item)
+              elif isinstance(value, list):
+                  for item in value:
+                      walk(item)
+              elif isinstance(value, str) and value.startswith("https://") and ".ipsw" in value:
+                  urls.append(value)
+          try:
+              walk(json.loads(text))
+          except json.JSONDecodeError:
+              pass
+          urls.extend(re.findall(r"https://[^\s\"']+?\.ipsw(?:\?[^\s\"']*)?", text))
+          ordered = sorted(set(urls), key=lambda url: (device not in url, build not in url, len(url)))
+          if not ordered:
+              raise SystemExit(f"AppleDB returned no IPSW URL for {device} / {build}")
+          print(ordered[0])
+          PY
+          }
+
+          BASE_IPSW_URL="$(resolve_url "$PATCH_BASE_BUILD" firmware/report/base-appledb-query.json)"
+          TARGET_IPSW_URL="$(resolve_url "$PATCH_TARGET_BUILD" firmware/report/target-appledb-query.json)"
+          [[ "$BASE_IPSW_URL" == https://*.ipsw* ]]
+          [[ "$TARGET_IPSW_URL" == https://*.ipsw* ]]
+          test "$BASE_IPSW_URL" != "$TARGET_IPSW_URL"
+          printf '%s\n' "$BASE_IPSW_URL" > firmware/report/base-ipsw-url.txt
+          printf '%s\n' "$TARGET_IPSW_URL" > firmware/report/target-ipsw-url.txt
+          ipsw --no-color info --remote "$BASE_IPSW_URL" --json > firmware/report/base-remote-info.json
+          ipsw --no-color info --remote "$TARGET_IPSW_URL" --json > firmware/report/target-remote-info.json
+          grep -q "$PATCH_DEVICE" firmware/report/base-remote-info.json
+          grep -q "$PATCH_BASE_BUILD" firmware/report/base-remote-info.json
+          grep -q "$PATCH_DEVICE" firmware/report/target-remote-info.json
+          grep -q "$PATCH_TARGET_BUILD" firmware/report/target-remote-info.json
+          echo "BASE_IPSW_URL=$BASE_IPSW_URL" >> "$GITHUB_ENV"
+          echo "TARGET_IPSW_URL=$TARGET_IPSW_URL" >> "$GITHUB_ENV"
+
+      - name: Download and verify both exact IPSWs
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 5 --continue-at - "$BASE_IPSW_URL" --output firmware/base.ipsw
+          curl --fail --location --retry 5 --continue-at - "$TARGET_IPSW_URL" --output firmware/target.ipsw
+          test "$(stat -f%z firmware/base.ipsw)" -gt 1000000000
+          test "$(stat -f%z firmware/target.ipsw)" -gt 1000000000
+          ipsw --no-color info firmware/base.ipsw --json > firmware/report/base-local-info.json
+          ipsw --no-color info firmware/target.ipsw --json > firmware/report/target-local-info.json
+          grep -q "$PATCH_BASE_BUILD" firmware/report/base-local-info.json
+          grep -q "$PATCH_TARGET_BUILD" firmware/report/target-local-info.json
+          shasum -a 256 firmware/base.ipsw firmware/target.ipsw > firmware/report/IPSW-SHA256SUMS
+          df -h /
+
+      - name: Run selected static IPSW diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          DIFF_FLAGS=()
+          while IFS= read -r flag; do
+            test -n "$flag" && DIFF_FLAGS+=("$flag")
+          done < firmware/request/diff-flags.txt
+          test "${#DIFF_FLAGS[@]}" -ge 1
+
+          set +e
+          ipsw --no-color diff firmware/base.ipsw firmware/target.ipsw \
+            "${DIFF_FLAGS[@]}" \
+            --json \
+            --clean \
+            --cache-dir firmware/cache \
+            --cache-max-size 12GiB \
+            --title "Aegis27 $PATCH_DEVICE $PATCH_BASE_BUILD to $PATCH_TARGET_BUILD" \
+            --output firmware/raw \
+            2>&1 | tee firmware/raw/ipsw-diff.log
+          DIFF_STATUS=${PIPESTATUS[0]}
+          set -e
+          test "$DIFF_STATUS" -eq 0
+          test -n "$(find firmware/raw -type f | head -n 1)"
+
+      - name: Build compact ranked report
+        shell: bash
+        run: |
+          set -euo pipefail
+          IPSW_VERSION="$(tr '\n' ' ' < firmware/report/ipsw-version.txt)"
+          if [[ "$GITHUB_EVENT_NAME" == "repository_dispatch" ]]; then
+            ANALYSIS_NAME="analysis-$ASSET_ID.json"
+          else
+            ANALYSIS_NAME="ipsw-patch-diff-report.json"
+          fi
+          echo "ANALYSIS_NAME=$ANALYSIS_NAME" >> "$GITHUB_ENV"
+          python3 scripts/patch_diff_lab.py summarize firmware/raw \
+            --request firmware/request/request.json \
+            --output "firmware/report/$ANALYSIS_NAME" \
+            --summary firmware/report/SUMMARY.md \
+            --ipsw-version "$IPSW_VERSION"
+          cp firmware/request/request.json firmware/report/request.json
+          cp firmware/request/diff-flags.txt firmware/report/diff-flags.txt
+          python3 -m json.tool "firmware/report/$ANALYSIS_NAME" >/dev/null
+          shasum -a 256 firmware/report/*.json > firmware/report/JSON-SHA256SUMS
+          cat firmware/report/SUMMARY.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Return compact result to Aegis inbox
+        if: github.event_name == 'repository_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            --data-binary "@firmware/report/$ANALYSIS_NAME" \
+            "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?name=$ANALYSIS_NAME" \
+            >/dev/null
+
+      - name: Delete processed request asset
+        if: github.event_name == 'repository_dispatch' && success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            -X DELETE \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/assets/$ASSET_ID"
+
+      - name: Remove full IPSWs and cache
+        if: always()
+        shell: bash
+        run: |
+          rm -f firmware/base.ipsw firmware/target.ipsw
+          rm -rf firmware/cache
+          df -h / || true
+
+      - name: Upload compact report and raw text diff
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aegis27-IPSW-Patch-Diff-${{ env.PATCH_DEVICE }}-${{ env.PATCH_BASE_BUILD }}-${{ env.PATCH_TARGET_BUILD }}
+          path: |
+            firmware/report/
+            firmware/raw/**/*.json
+            firmware/raw/**/*.md
+            firmware/raw/**/*.txt
+            firmware/raw/**/*.log
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 9

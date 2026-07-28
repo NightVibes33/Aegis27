@@ -6,6 +6,7 @@ struct Aegis27App: App {
     @StateObject private var transportCoordinator = BoundaryTransportCoordinator()
     @State private var showFuzzerHarness = false
     @State private var showCrashTriage = false
+    @State private var showPatchDiffLab = false
     @State private var showBoundaryLab = false
 
     var body: some Scene {
@@ -28,6 +29,17 @@ struct Aegis27App: App {
                                 .shadow(radius: 5)
                         }
                         .accessibilityLabel("Open Boundary Lab")
+
+                        Button {
+                            showPatchDiffLab = true
+                        } label: {
+                            Image(systemName: "arrow.left.arrow.right.square")
+                                .font(.title3.weight(.semibold))
+                                .frame(width: 52, height: 52)
+                                .background(.ultraThinMaterial, in: Circle())
+                                .shadow(radius: 5)
+                        }
+                        .accessibilityLabel("Open IPSW Patch-Diff Lab")
 
                         Button {
                             showCrashTriage = true
@@ -65,6 +77,21 @@ struct Aegis27App: App {
                                     }
                                 }
                             }
+                    }
+                }
+                .sheet(isPresented: $showPatchDiffLab) {
+                    NavigationStack {
+                        PatchDiffLabView(
+                            profile: viewModel.profile,
+                            logger: viewModel.logger
+                        )
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button("Done") {
+                                    showPatchDiffLab = false
+                                }
+                            }
+                        }
                     }
                 }
                 .sheet(isPresented: $showCrashTriage) {
